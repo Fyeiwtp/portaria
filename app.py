@@ -83,7 +83,7 @@ if 'alunos_db' not in st.session_state:
         {"Numero": "219A", "Nome": "Leandro Medeiros Amaral", "Quarto": "Quarto 219A"},
         {"Numero": "219B", "Nome": "Rafael Cabral da Silva", "Quarto": "Quarto 219B"},
         {"Numero": "220A", "Nome": "Margarida Pereira", "Quarto": "Quarto 220A"},
-        {"Numero": "220B", "Nome": "Carlota Oliveira Baptista Reis", "Quarto": "Quarto 220B"},
+        {"Numero": "220B", "Theme": "Carlota Oliveira Baptista Reis", "Quarto": "Quarto 220B"},
         {"Numero": "221A", "Nome": "Daniela Alexandra Marques Carreira", "Quarto": "Quarto 221A"},
         {"Numero": "221B", "Nome": "Matilde Bairos Fumo", "Quarto": "Quarto 221B"},
         {"Numero": "222A", "Nome": "Maria Elvira Basílio Canada", "Quarto": "Quarto 222A"},
@@ -122,22 +122,17 @@ with col2:
 
 if (entrada or saida) and num_introduzido:
     aluno = st.session_state.alunos_db[st.session_state.alunos_db['Numero'].str.lower() == num_introduzido.lower()]
-    
     if not aluno.empty:
         nome_aluno = aluno.iloc['Nome']
         quarto_aluno = aluno.iloc['Quarto']
         hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         tipo_movimento = "ENTRADA" if entrada else "SAÍDA"
-        
-        st.session_state.livro_registo.append({
-            "Data/Hora": hora_atual,
-            "Quarto": quarto_aluno,
-            "Nome do Aluno": nome_aluno,
-            "Movimento": tipo_movimento
-        })
-        
-        if entrada:
-            st.success(f"✅ Registada ENTRADA: {nome_aluno} ({quarto_aluno}) às {hora_atual}")
-        else:
-            st.warning(f"🚪 Registada SAÍDA: {nome_aluno} ({quarto_aluno}) às {hora_atual}")
+        st.session_state.livro_registo.append({"Data/Hora": hora_atual, "Quarto": quarto_aluno, "Nome do Aluno": nome_aluno, "Movimento": tipo_movimento})
+        st.success(f"✅ Registada {tipo_movimento}: {nome_aluno} ({quarto_aluno}) às {hora_atual}")
     else:
+        st.error(f"⚠️ O quarto '{num_introduzido}' não foi encontrado na base de dados.")
+
+st.write("---")
+st.write("### 📋 Livro de Registo Diário (Atualizado em Tempo Real)")
+
+# A tabela agora fica sempre fixa sem condições de "else" invisíveis
