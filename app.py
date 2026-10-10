@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import io
 
 st.set_page_config(page_title="Portaria e Quartos", page_icon="📝", layout="wide")
 
@@ -13,7 +14,7 @@ if st.sidebar.button("🧹 Reiniciar Base de Dados / Limpar Cache"):
     st.session_state.clear()
     st.rerun()
 
-# BASE DE DADOS COMPACTADA OFICIAL E CONVERTIDA (Totalmente revista)
+# BASE DE DADOS COMPACTADA OFICIAL E CONVERTIDA
 if 'alunos_db' not in st.session_state:
     dados_brutos = [
         ("1.9A", "Safira Coelho Curado"), ("1.9B", "Yolanta Yermakova"), ("110A", "Iara Victoria Amorim Senra"),
@@ -52,7 +53,6 @@ if 'alunos_db' not in st.session_state:
 if 'livro_registo' not in st.session_state:
     st.session_state.livro_registo = []
 
-# Criar lista organizada para o menu de pesquisa interativa
 opcoes_pesquisa = ["-- Clique para digitar Quarto ou Nome --"]
 for _, row in st.session_state.alunos_db.iterrows():
     opcoes_pesquisa.append(f"{row['Numero']} | {row['Nome']}")
@@ -81,7 +81,6 @@ col_esquerda, col_direita = st.columns(2, gap="large")
 
 with col_esquerda:
     st.write("### 🔍 Pesquisa e Entrada (Portaria)")
-    
     if "contador_reset" not in st.session_state:
         st.session_state.contador_reset = 0
         
@@ -126,27 +125,37 @@ with col_direita:
     else:
         st.info("Nenhum movimento registado neste turno.")
 
-# --- BOTÕES DE EXPORTAÇÃO DIRETOS E TOTALMENTE SEGUROS ---
+# --- BOTÕES DE EXPORTAÇÃO SEGUROS UTILIZANDO SISTEMA NATIVO ---
 st.write("---")
 st.write("### ⬇️ Exportar Relatório de Final de Dia")
 
 df_export = pd.DataFrame(st.session_state.livro_registo if st.session_state.livro_registo else [{"Data/Hora": "-", "Quarto": "-", "Nome do Aluno": "-", "Movimento": "-"}])
 
-col_btn1, col_btn2 = st.columns(2)
+# 1. Gerador Oficial de Excel em memória
+buffer_excel = io.BytesIO()
+with pd.ExcelWriter(buffer_excel, engine='xlsxwriter') as writer:
+    df_export.to_excel(writer, sheet_name='Registo Turno', index=False)
+buffer_excel.seek(0)
 
-with col_btn1:
-    # Método nativo do navegador: abre a janela de impressão limpa para guardar em PDF sem risco de falha
-    st.markdown(
-        '<a href="javascript:window.print()" style="text-decoration:none;"><button style="width:100%; height:38px; background-color:#1E3A8A; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">📄 Abrir Janela de Impressão (Guardar como PDF)</button></a>', 
-        unsafe_allow_html=True
+# 2. Gerador Oficial de Texto Estruturado (Alternativa leve e limpa)
+string_texto = df_export.to_string(index=False)
+
+col_exp1, col_export2 = st.columns(2)
+
+with col_exp1:
+    st.download_button(
+        label="📊 Descarregar Relatório Completo para Excel (.xlsx)",
+        data=buffer_excel,
+        file_name=f"relatorio_portaria_{datetime.now().strftime('%Y%m%d')}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True
     )
 
-with col_btn2:
-    # Descarrega diretamente o ficheiro Excel compatível
+with col_export2:
     st.download_button(
-        label="📊 Descarregar Folha Excel (CSV)", 
-        data=df_export.to_csv(index=False).encode('utf-8'), 
-        file_name=f"relatorio_portaria_{datetime.now().strftime('%Y%m%d')}.csv", 
-        mime="text/csv", 
+        label="📄 Descarregar Livro de Ponto em Texto (.txt)",
+        data=string_texto,
+        file_name=f"relatorio_portaria_{datetime.now().strftime('%Y%m%d')}.txt",
+        mime="text/plain",
         use_container_width=True
     )
