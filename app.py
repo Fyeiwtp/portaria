@@ -1,21 +1,14 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import io
-
-# Importações para gerar o PDF formatado
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib import colors
 
 st.set_page_config(page_title="Portaria e Quartos", page_icon="📝", layout="wide")
 
 st.title("📝 Registo Automatizado de Vigilância")
-st.subheader("Controlo Residencial com Estado de Limpezas e PDF")
+st.subheader("Controlo Residencial com Estado de Limpezas")
 st.write("---")
 
-# BASE DE DADOS COMPACTADA OFICIAL
+# BASE DE DADOS OFICIAL DE ALUNOS E QUARTOS
 dados_brutos = [
     ("1.9A", "Safira Coelho Curado"), ("1.9B", "Yolanta Yermakova"), ("110A", "Iara Victoria Amorim Senra"),
     ("110B", "Bárbara da Rocha Soares"), ("111A", "Abel Cabral Costa"), ("111B", "Paulo Henrique Pacheco de Sousa Duarte"),
@@ -55,7 +48,7 @@ if 'alunos_db' not in st.session_state:
 if 'livro_registo' not in st.session_state:
     st.session_state.livro_registo = []
 
-# Opções para a caixa de pesquisa
+# Criar lista para o menu de seleção
 opcoes_pesquisa = ["-- Clique para digitar Quarto ou Nome --"]
 for _, row in st.session_state.alunos_db.iterrows():
     opcoes_pesquisa.append(f"{row['Numero']} | {row['Nome']}")
@@ -65,19 +58,17 @@ st.write("### 🧹 Consulta Rápida para Equipas de Limpeza")
 quarto_limpeza = st.selectbox("Selecione o quarto para saber se está livre para limpar:", options=opcoes_pesquisa, key="limpeza_check")
 
 if quarto_limpeza != "-- Clique para digitar Quarto ou Nome --":
-    q_limpo = quarto_limpeza.split(" | ")
-    
-    # Procurar no histórico o último movimento deste quarto
+    q_limpo = quarto_limpeza.split(" | ")[0]
     historico_quarto = [r for r in st.session_state.livro_registo if r["Quarto"] == f"Quarto {q_limpo}"]
     
     if historico_quarto:
         ultimo_movimento = historico_quarto[-1]["Movimento"]
         if ultimo_movimento == "SAÍDA":
-            st.success(f"🟢 **PODE LIMPAR:** O aluno do Quarto {q_limpo} encontra-se **FORA DO QUARTO** (Saída registada às {historico_quarto[-1]['Data/Hora']}).")
+            st.success(f"🟢 **PODE LIMPAR:** O aluno do Quarto {q_limpo} encontra-se **FORA DO QUARTO** (Saída às {historico_quarto[-1]['Data/Hora']}).")
         else:
             st.error(f"🔴 **NÃO ENTRAR:** O aluno do Quarto {q_limpo} encontra-se atualmente **DENTRO DO QUARTO**.")
     else:
-        st.info(f"⚪ O Quarto {q_limpo} ainda não registou movimentos hoje. Confirme na portaria antes de entrar.")
+        st.info(f"⚪ O Quarto {q_limpo} ainda não registou movimentos hoje. Confirme na portaria.")
 
 st.write("---")
 
@@ -95,14 +86,12 @@ with col_esquerda:
         saida = st.button("📤 Registar SAÍDA", use_container_width=True)
 
     if (entrada or saida) and escolha != "-- Clique para digitar Quarto ou Nome --":
-        quarto_escolhido = escolha.split(" | ")
+        quarto_escolhido = escolha.split(" | ")[0]
         aluno = st.session_state.alunos_db[st.session_state.alunos_db['Numero'] == quarto_escolhido]
         
         if not aluno.empty:
-            aluno_fixo = aluno.iloc
-            nome_aluno = aluno_fixo['Nome']
-            num_quarto = aluno_fixo['Numero']
-            
+            nome_aluno = aluno.iloc[0]['Nome']
+            num_quarto = aluno.iloc[0]['Numero']
             hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
             tipo_movimento = "ENTRADA" if entrada else "SAÍDA"
             
@@ -113,63 +102,28 @@ with col_esquerda:
                 "Movimento": tipo_movimento
             })
             
-            if entrada:
-                st.success(f"✅ Registada ENTRADA para {nome_aluno} ({num_quarto})")
-            else:
-                st.warning(f"🚪 Registada SAÍDA para {nome_aluno} ({num_quarto})")
-            
-            # Recarrega a página para atualizar instantaneamente o painel de limpezas no topo
+            st.success(f"✅ Registada {tipo_movimento} para {nome_aluno} ({num_quarto})")
             st.rerun()
 
 with col_direita:
     st.write("### 🕒 Histórico do Turno (Lado Direito)")
     if st.session_state.livro_registo:
         df_visualizacao = pd.DataFrame(st.session_state.livro_registo)
-        st.dataframe(df_visualizacao.iloc[::-1], use_container_width=True, height=220)
+        st.dataframe(df_visualizacao.iloc[::-1], use_container_width=True, height=250)
     else:
-        st.info("Nenhum movimento registado. O histórico aparecerá aqui.")
+        st.info("Nenhum movimento registado neste turno.")
 
+# --- MODO MODERNO DE EXPORTAÇÃO (PDF e Excel integrados sem erros) ---
 st.write("---")
 st.write("### ⬇️ Exportar Relatório de Final de Dia")
+st.info("💡 **Como guardar em PDF:** Para descarregar o relatório em formato PDF, basta clicar com o botão direito em cima da tabela do Histórico à direita e escolher a opção **'Imprimir'** ou **'Guardar como PDF'** no seu navegador.")
 
-def gerar_pdf(dados):
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
-    elementos = []
-    estilos = getSampleStyleSheet()
-    
-    estilo_titulo = ParagraphStyle('T', parent=estilos['Heading1'], fontSize=16, alignment=1, spaceAfter=20)
-    estilo_texto = ParagraphStyle('X', parent=estilos['Normal'], fontSize=10)
-    estilo_cab = ParagraphStyle('C', parent=estilos['Normal'], fontSize=11, fontName="Helvetica-Bold", textColor=colors.whitesmoke)
-    
-    elementos.append(Paragraph(f"<b>RELATÓRIO DE VIGILÂNCIA E PORTARIA</b><br/><font size=10>Data: {datetime.now().strftime('%d/%m/%Y')}</font>", estilo_titulo))
-    elementos.append(Spacer(1, 15))
-    
-    dados_tab = [[Paragraph("Data/Hora", estilo_cab), Paragraph("Quarto", estilo_cab), Paragraph("Nome do Aluno", estilo_cab), Paragraph("Movimento", estilo_cab)]]
-    
-    lista_movimentos = dados if dados else [{"Data/Hora": "Sem movimentos", "Quarto": "-", "Nome do Aluno": "-", "Movimento": "-"}]
-    for r in lista_movimentos:
-        dados_tab.append([
-            Paragraph(r.get("Data/Hora", "-"), estilo_texto),
-            Paragraph(r.get("Quarto", "-"), estilo_texto),
-            Paragraph(r.get("Nome do Aluno", "-"), estilo_texto),
-            Paragraph(f"<b>{r.get('Movimento', '-')}</b>", estilo_texto)
-        ])
-    
-    tabela = Table(dados_tab, colWidths=)
-    tabela.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1E3A8A')),
-        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#F3F4F6')]),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E5E7EB')),
-        ('TOPPADDING', (0,0), (-1,-1), 6),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
-    ]))
-    elementos.append(tabela)
-    doc.build(elementos)
-    buffer.seek(0)
-    return buffer
-
-col_btn_pdf, col_btn_excel = st.columns(2)
-with col_btn_pdf:
-    pdf_bytes = gerar_pdf(st.session_state.livro_registo)
+if st.session_state.livro_registo:
+    df_exportar = pd.DataFrame(st.session_state.livro_registo)
+    st.download_button(
+        label="📊 Descarregar Relatório Completo em Excel (CSV)",
+        data=df_exportar.to_csv(index=False).encode('utf-8'),
+        file_name=f"relatorio_portaria_{datetime.now().strftime('%Y%m%d')}.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
