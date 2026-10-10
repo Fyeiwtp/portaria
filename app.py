@@ -101,7 +101,9 @@ if 'alunos_db' not in st.session_state:
         {"Numero": "228A", "Nome": "Luana Filipa da Silva Cabral", "Quarto": "Quarto 228A"},
         {"Numero": "228B", "Nome": "Jéssica Inês Alves Teixeira", "Quarto": "Quarto 228B"},
         {"Numero": "229A", "Nome": "Maria Inês Figueiredo Bentes", "Quarto": "Quarto 229A"},
+        {"Numero": "229B", "Nome": "Mariana Alves Barrinha", "Quarto": "Quarto 229B"},
         {"Numero": "230A", "Nome": "Helena Isabel Ramos da Costa", "Quarto": "Quarto 230A"},
+        {"Numero": "230B", "Nome": "Joana Margarida Paim Gregório", "Quarto": "Quarto 230B"},
         {"Numero": "231A", "Nome": "Pedro Guilherme Baptista Silva", "Quarto": "Quarto 231A"},
         {"Numero": "231B", "Nome": "Duarte Carreno Novais", "Quarto": "Quarto 231B"},
     ])
@@ -117,17 +119,18 @@ opcoes_alunos = ["-- Selecione ou digite o número do quarto --"] + [
 st.write("### 🔍 Pesquisa Instantânea de Aluno")
 escolha = st.selectbox("Comece a digitar o número do quarto para pesquisar:", options=opcoes_alunos)
 
-# Processa apenas se o vigilante tiver escolhido um aluno válido
 if escolha != "-- Selecione ou digite o número do quarto --":
-    # Extrair o número do quarto a partir do texto selecionado
-    quarto_selecionado = escolha.split(" - ")[0].replace("Quarto ", "")
-    aluno_selecionado = st.session_state.alunos_db[st.session_state.alunos_db['Numero'] == quarto_selecionado].iloc[0]
+    # Isolar a parte que contém apenas o número do quarto
+    parte_quarto = escolha.split(" - ")[0]
+    quarto_limpo = parte_quarto.replace("Quarto ", "")
+    
+    # Localizar o registo correspondente
+    aluno_selecionado = st.session_state.alunos_db[st.session_state.alunos_db['Numero'] == quarto_limpo].iloc[0]
     
     nome_aluno = aluno_selecionado['Nome']
     quarto_aluno = aluno_selecionado['Quarto']
     
-    # Mostrar feedback visual instantâneo do aluno selecionado
-    st.info(f"👤 **Aluno Selecionado:** {nome_aluno} | 🛏️ **{quarto_aluno}**")
+    st.info(f"👤 **Aluno:** {nome_aluno} | 🛏️ **{quarto_aluno}**")
     
     col1, col2 = st.columns(2)
     with col1:
@@ -137,6 +140,3 @@ if escolha != "-- Selecione ou digite o número do quarto --":
         
     if entrada or saida:
         hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        tipo_movimento = "ENTRADA" if entrada else "SAÍDA"
-        
-        st.session_state.livro_registo.append({
