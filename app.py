@@ -91,7 +91,7 @@ if st.session_state.livro_registo:
                 Paragraph(f"<b>{r['Movimento']}</b>", estilo_texto)
             ])
         
-        tabela = Table(dados_tabela, colWidths=)
+       tabela = Table(dados_tabela, colWidths=[110, 40, 180, 80, 80])
         tabela.setStyle(TableStyle([
             ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1E3A8A')),
             ('ALIGN', (0,0), (-1,-1), 'LEFT'),
