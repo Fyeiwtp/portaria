@@ -247,7 +247,7 @@ def carregar_movimentos(periodo=None):
                        nome_aluno AS 'Nome do Aluno',
                        movimento AS 'Movimento',
                        periodo AS 'Dia Operacional',
-                        COALESCE(funcionario, 'Registo anterior') AS 'Funcionário',
+                        COALESCE(NULLIF(TRIM(funcionario), ''), '—') AS 'Vigilante',
                        CASE WHEN EXISTS (SELECT 1 FROM correcoes_estado c WHERE c.movimento_id = movimentos.id)
                             THEN 'CORREÇÃO MANUAL' ELSE 'REGISTO NORMAL' END AS 'Origem'
                 FROM movimentos
@@ -264,7 +264,7 @@ def carregar_movimentos(periodo=None):
                        nome_aluno AS 'Nome do Aluno',
                        movimento AS 'Movimento',
                        periodo AS 'Dia Operacional',
-                        COALESCE(funcionario, 'Registo anterior') AS 'Funcionário',
+                        COALESCE(NULLIF(TRIM(funcionario), ''), '—') AS 'Vigilante',
                        CASE WHEN EXISTS (SELECT 1 FROM correcoes_estado c WHERE c.movimento_id = movimentos.id)
                             THEN 'CORREÇÃO MANUAL' ELSE 'REGISTO NORMAL' END AS 'Origem'
                 FROM movimentos
@@ -744,7 +744,7 @@ with col_direita:
     df_atual = carregar_movimentos(periodo_atual)
     if not df_atual.empty:
         st.dataframe(
-            df_atual[["Data/Hora", "Quarto", "Nome do Aluno", "Movimento", "Origem", "Funcionário"]].iloc[::-1],
+            df_atual[["Data/Hora", "Quarto", "Nome do Aluno", "Movimento", "Origem", "Vigilante"]].iloc[::-1],
             use_container_width=True,
             height=400,
         )
@@ -789,7 +789,7 @@ else:
     st.info(f"📋 {len(df_export)} movimento(s) encontrado(s) de {rotulo}.")
     if not df_export.empty:
         with st.expander("👁️ Ver movimentos deste período"):
-            st.dataframe(df_todos.loc[df_export.index, ["Data/Hora", "Quarto", "Nome do Aluno", "Movimento", "Origem", "Funcionário"]] if not df_todos.empty else df_export, use_container_width=True, hide_index=True)
+            st.dataframe(df_todos.loc[df_export.index, ["Data/Hora", "Quarto", "Nome do Aluno", "Movimento", "Origem", "Vigilante"]] if not df_todos.empty else df_export, use_container_width=True, hide_index=True)
 
     pdf_bytes = criar_pdf(df_export, "RELATÓRIO DE PORTARIA E VIGILÂNCIA", rotulo, intervalo_calendario=True)
     csv_bytes = df_export.to_csv(index=False).encode("utf-8-sig")
