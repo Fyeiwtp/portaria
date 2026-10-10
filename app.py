@@ -531,73 +531,47 @@ col_esquerda, col_direita = st.columns(2, gap="large")
 
 with col_esquerda:
     st.markdown('<div class="section-title">🔍 Registo de entradas e saídas</div>', unsafe_allow_html=True)
-    # Pesquisa por quarto ou nome, com escolha explícita quando há vários resultados.
-    # Quando há uma correspondência única, o outro campo é preenchido automaticamente.
+    # O selectbox permite escrever diretamente e filtra os nomes na própria lista.
+    # A opção mostra também o quarto para distinguir alunos com nomes semelhantes.
     mapa_quartos = {str(r["Numero"]).strip().upper(): str(r["Nome"]) for _, r in alunos_db.iterrows()}
-    mapa_nomes = {str(r["Nome"]).strip(): str(r["Numero"]) for _, r in alunos_db.iterrows()}
+    opcoes_alunos = [f"{str(r['Nome'])} | Quarto {str(r['Numero'])}" for _, r in alunos_db.iterrows()]
+    opcoes_por_quarto = {str(r["Numero"]).strip().upper(): f"{str(r['Nome'])} | Quarto {str(r['Numero'])}" for _, r in alunos_db.iterrows()}
+    quarto_por_opcao = {v: k for k, v in opcoes_por_quarto.items()}
 
     if "pesquisa_quarto" not in st.session_state:
         st.session_state.pesquisa_quarto = ""
-    if "pesquisa_nome" not in st.session_state:
-        st.session_state.pesquisa_nome = ""
-    if "pesquisa_origem" not in st.session_state:
-        st.session_state.pesquisa_origem = "quarto"
+    if "aluno_sugerido" not in st.session_state:
+        st.session_state.aluno_sugerido = None
 
     def pesquisar_quarto():
-        st.session_state.pesquisa_origem = "quarto"
-        q = st.session_state.pesquisa_quarto.strip().upper()
-        if q in mapa_quartos:
-            st.session_state.pesquisa_nome = mapa_quartos[q]
-        else:
-            st.session_state.pesquisa_nome = ""
+        quarto = st.session_state.pesquisa_quarto.strip().upper()
+        st.session_state.aluno_sugerido = opcoes_por_quarto.get(quarto)
 
-    def pesquisar_nome():
-        st.session_state.pesquisa_origem = "nome"
-        nome_digitado = st.session_state.pesquisa_nome.strip().casefold()
-        correspondencias = [n for n in mapa_nomes if nome_digitado and nome_digitado in n.casefold()]
-        if len(correspondencias) == 1:
-            st.session_state.pesquisa_quarto = mapa_nomes[correspondencias[0]]
+    def escolher_nome():
+        opcao = st.session_state.aluno_sugerido
+        if opcao:
+            st.session_state.pesquisa_quarto = quarto_por_opcao[opcao]
         else:
             st.session_state.pesquisa_quarto = ""
 
     st.text_input("🔢 Número do quarto", placeholder="Ex.: 110A", key="pesquisa_quarto", on_change=pesquisar_quarto)
-    st.text_input("👤 Nome do aluno", placeholder="Escreve o nome ou parte dele", key="pesquisa_nome", on_change=pesquisar_nome)
+    st.selectbox(
+        "👤 Nome do aluno",
+        options=opcoes_alunos,
+        index=None,
+        placeholder="Escreve o nome e escolhe uma sugestão…",
+        key="aluno_sugerido",
+        on_change=escolher_nome,
+        help="Escreve diretamente nesta caixa: a lista filtra os nomes automaticamente, com o quarto ao lado.",
+    )
 
     quarto_texto = st.session_state.pesquisa_quarto.strip().upper()
-    nome_texto = st.session_state.pesquisa_nome.strip()
-    quarto_escolhido = None
-    if st.session_state.pesquisa_origem == "quarto":
-        if quarto_texto in mapa_quartos:
-            quarto_escolhido = quarto_texto
-        elif quarto_texto:
-            st.caption("Quarto não encontrado. Confirma o número.")
-    else:
-        if nome_texto:
-            # Mostra todas as correspondências, mesmo quando há nomes repetidos.
-            encontrados = [
-                (str(r["Numero"]), str(r["Nome"]))
-                for _, r in alunos_db.iterrows()
-                if nome_texto.casefold() in str(r["Nome"]).casefold()
-            ]
-            if len(encontrados) == 1:
-                quarto_escolhido = encontrados[0][0]
-            elif len(encontrados) > 1:
-                st.caption(f"🔎 {len(encontrados)} alunos encontrados. Escolhe o correto:")
-                opcoes = ["— Seleciona um aluno —"] + [
-                    f"{nome} | Quarto {quarto}" for quarto, nome in encontrados
-                ]
-                # Uma chave por pesquisa impede que fique selecionado um aluno de outra pesquisa.
-                escolhido = st.selectbox(
-                    "Resultados da pesquisa",
-                    options=opcoes,
-                    key=f"resultado_nome_{nome_texto.casefold()}",
-                    label_visibility="collapsed",
-                )
-                if escolhido != opcoes[0]:
-                    indice = opcoes.index(escolhido) - 1
-                    quarto_escolhido = encontrados[indice][0]
-            else:
-                st.caption("Aluno não encontrado.")
+    opcao_escolhida = st.session_state.aluno_sugerido
+    quarto_escolhido = quarto_por_opcao.get(opcao_escolhida) if opcao_escolhida else None
+    if quarto_escolhido is None and quarto_texto in mapa_quartos:
+        quarto_escolhido = quarto_texto
+    elif quarto_escolhido is None and quarto_texto:
+        st.caption("Quarto não encontrado. Confirma o número.")
 
     if quarto_escolhido:
         st.success(f"**Quarto {quarto_escolhido}** — {mapa_quartos[quarto_escolhido]}")
@@ -629,7 +603,7 @@ with col_esquerda:
                 st.success(f"Registada {tipo} para {nome_aluno}.")
                 st.rerun()
     elif (entrada or saida) and quarto_escolhido is None:
-        st.warning("Seleciona um aluno da lista ou escreve um quarto válido.")
+        st.warning("Escolhe um aluno nas sugestões ou escreve um quarto válido.")
 
 with col_direita:
     st.markdown('<div class="section-title">🕒 Histórico de movimentos</div>', unsafe_allow_html=True)
