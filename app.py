@@ -9,10 +9,11 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
-st.set_page_config(page_title="Registo de Portaria e Quartos", page_icon="📝", layout="centered")
+# Configuração da página em modo Largo para caber o histórico à direita
+st.set_page_config(page_title="Registo de Portaria e Quartos", page_icon="📝", layout="wide")
 
 st.title("📝 Registo Automatizado de Vigilância")
-st.subheader("Controlo de Quartos com Exportação em PDF")
+st.write("---")
 
 # LISTA OFICIAL DE ALUNOS E QUARTOS
 if 'alunos_db' not in st.session_state:
@@ -110,35 +111,32 @@ if 'alunos_db' not in st.session_state:
 if 'livro_registo' not in st.session_state:
     st.session_state.livro_registo = []
 
-st.write("### 🔍 Registo por Número de Quarto")
-num_introduzido = st.text_input("Introduza o Número do Quarto (Ex: 110A, 215B):", placeholder="Ex: 110A", key="num_aluno").strip()
+# Criação das duas colunas: Esquerda para controlo, Direita para o histórico visual
+col_esquerda, col_direita = st.columns([1, 1], gap="large")
 
-col1, col2 = st.columns(2)
-with col1:
-    entrada = st.button("📥 Registar ENTRADA", type="primary", use_container_width=True)
-with col2:
-    saida = st.button("📤 Registar SAÍDA", use_container_width=True)
+with col_esquerda:
+    st.write("### 🔑 Scanner e Registo")
+    num_introduzido = st.text_input("Introduza o Número do Quarto (Ex: 110A, 215B):", placeholder="Ex: 110A", key="num_aluno").strip()
 
-if (entrada or saida) and num_introduzido:
-    aluno = st.session_state.alunos_db[st.session_state.alunos_db['Numero'].str.lower() == num_introduzido.lower()]
-    
-    if not aluno.empty:
-        nome_aluno = aluno.iloc[0]['Nome']
-        quarto_aluno = aluno.iloc[0]['Quarto']
-        hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        tipo_movimento = "ENTRADA" if entrada else "SAÍDA"
+    btn_col1, btn_col2 = st.columns(2)
+    with btn_col1:
+        entrada = st.button("📥 Registar ENTRADA", type="primary", use_container_width=True)
+    with btn_col2:
+        saida = st.button("📤 Registar SAÍDA", use_container_width=True)
+
+    if (entrada or saida) and num_introduzido:
+        aluno = st.session_state.alunos_db[st.session_state.alunos_db['Numero'].str.lower() == num_introduzido.lower()]
         
-        st.session_state.livro_registo.append({
-            "Data/Hora": hora_atual,
-            "Quarto": quarto_aluno,
-            "Nome do Aluno": nome_aluno,
-            "Movimento": tipo_movimento
-        })
-        
-        if entrada:
-            st.success(f"✅ Registada ENTRADA: {nome_aluno} ({quarto_aluno})")
-        else:
-            st.warning(f"🚪 Registada SAÍDA: {nome_aluno} ({quarto_aluno})")
-    else:
-        st.error(f"⚠️ O quarto '{num_introduzido}' não foi encontrado na base de dados.")
-
+        if not aluno.empty:
+            nome_aluno = aluno.iloc[0]['Nome']
+            quarto_aluno = aluno.iloc[0]['Quarto']
+            hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            tipo_movimento = "ENTRADA" if entrada else "SAÍDA"
+            
+            st.session_state.livro_registo.append({
+                "Data/Hora": hora_atual,
+                "Quarto": quarto_aluno,
+                "Nome do Aluno": nome_aluno,
+                "Movimento": tipo_movimento
+            })
+            
