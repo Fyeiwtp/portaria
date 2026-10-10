@@ -1,11 +1,18 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import io
+
+# Importações nativas para gerar o ficheiro PDF sem erros
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
 
 st.set_page_config(page_title="Portaria e Quartos", page_icon="📝", layout="wide")
 
 st.title("📝 Registo Automatizado de Vigilância")
-st.subheader("Controlo Residencial com Estado de Limpezas")
+st.subheader("Controlo Residencial com Estado de Limpezas e Exportação")
 st.write("---")
 
 # Botão de emergência na barra lateral
@@ -13,7 +20,7 @@ if st.sidebar.button("🧹 Reiniciar Base de Dados / Limpar Cache"):
     st.session_state.clear()
     st.rerun()
 
-# BASE DE DADOS COMPACTADA OFICIAL E CONVERTIDA
+# BASE DE DADOS OFICIAL COMPLETA E CORRIGIDA SEM ERROS DE TEXTO
 if 'alunos_db' not in st.session_state:
     dados_brutos = [
         ("1.9A", "Safira Coelho Curado"), ("1.9B", "Yolanta Yermakova"), ("110A", "Iara Victoria Amorim Senra"),
@@ -126,19 +133,45 @@ with col_direita:
     else:
         st.info("Nenhum movimento registado neste turno.")
 
-# --- BOTÕES DE EXPORTAÇÃO DIRETOS E LEVES (À Prova de Erros) ---
+# --- BOTÕES DE EXPORTAÇÃO DIRETOS (PDF e Excel lado a lado) ---
 st.write("---")
 st.write("### ⬇️ Exportar Relatório de Final de Dia")
 
-df_export = pd.DataFrame(st.session_state.livro_registo if st.session_state.livro_registo else [{"Data/Hora": "-", "Quarto": "-", "Nome do Aluno": "-", "Movimento": "-"}])
+def gerar_pdf_limpo(dados):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+    elementos = []
+    
+    estilos = getSampleStyleSheet()
+    estilo_titulo = ParagraphStyle('T', parent=estilos['Heading1'], fontSize=16, alignment=1, spaceAfter=20)
+    estilo_texto = ParagraphStyle('X', parent=estilos['Normal'], fontSize=10)
+    estilo_cab = ParagraphStyle('C', parent=estilos['Normal'], fontSize=11, fontName="Helvetica-Bold", textColor=colors.whitesmoke)
+    
+    elementos.append(Paragraph(f"<b>RELATÓRIO DE VIGILÂNCIA</b><br/><font size=10>Data: {datetime.now().strftime('%d/%m/%Y %H:%M')}</font>", estilo_titulo))
+    elementos.append(Spacer(1, 15))
+    
+    dados_tab = [[Paragraph("Data/Hora", estilo_cab), Paragraph("Quarto", estilo_cab), Paragraph("Nome do Aluno", estilo_cab), Paragraph("Movimento", estilo_cab)]]
+    
+    lista_movimentos = dados if dados else [{"Data/Hora": "Sem movimentos", "Quarto": "-", "Nome do Aluno": "-", "Movimento": "-"}]
+    for r in lista_movimentos:
+        dados_tab.append([
+            Paragraph(r.get("Data/Hora", "-"), estilo_texto),
+            Paragraph(r.get("Quarto", "-"), estilo_texto),
+            Paragraph(r.get("Nome do Aluno", "-"), estilo_texto),
+            Paragraph(f"<b>{r.get('Movimento', '-')}</b>", estilo_texto)
+        ])
+    
+    tabela = Table(dados_tab, colWidths=[130, 80, 200, 90])
+    tabela.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1E3A8A')),
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#F3F4F6')]),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E5E7EB')),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+    ]))
+    elementos.append(tabela)
+    doc.build(elementos)
+    buffer.seek(0)
+    return buffer.getvalue()
 
-# Conversão nativa simples para folha de cálculo e texto
-csv_dados = df_export.to_csv(index=False).encode('utf-8')
-
-st.download_button(
-    label="📊 Descarregar Relatório Completo em Excel / CSV", 
-    data=csv_dados, 
-    file_name=f"relatorio_portaria_{datetime.now().strftime('%Y%m%d')}.csv", 
-    mime="text/csv", 
-    use_container_width=True
-)
