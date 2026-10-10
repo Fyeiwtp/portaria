@@ -14,7 +14,7 @@ st.set_page_config(page_title="Registo de Portaria e Quartos", page_icon="📝",
 st.title("📝 Registo Automatizado de Vigilância")
 st.subheader("Controlo de Quartos com Exportação em PDF")
 
-# LISTA OFICIAL DE ALUNOS E QUARTOS CARREGADA COMPLETA
+# LISTA OFICIAL DE ALUNOS E QUARTOS
 if 'alunos_db' not in st.session_state:
     st.session_state.alunos_db = pd.DataFrame([
         {"Numero": "1.9A", "Nome": "Safira Coelho Curado", "Quarto": "Quarto 1.9A"},
@@ -140,3 +140,5 @@ if (entrada or saida) and num_introduzido:
         else:
             st.warning(f"🚪 Registada SAÍDA: {nome_aluno} ({quarto_aluno})")
     else:
+        st.error(f"⚠️ O quarto '{num_introduzido}' não foi encontrado na base de dados.")
+
