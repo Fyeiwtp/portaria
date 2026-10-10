@@ -88,7 +88,16 @@ col_esquerda, col_direita = st.columns(2, gap="large")
 
 with col_esquerda:
     st.write("### 🔍 Pesquisa e Entrada (Portaria)")
-    escolha = st.selectbox("Pesquise pelo Quarto ou pelo Nome do Aluno para registar:", options=opcoes_pesquisa, key="portaria_reg")
+    
+    # Adicionado contador de chaves para forçar o reset automático da caixa de seleção
+    if "contador_reset" not in st.session_state:
+        st.session_state.contador_reset = 0
+        
+    escolha = st.selectbox(
+        "Pesquise pelo Quarto ou pelo Nome do Aluno para registar:", 
+        options=opcoes_pesquisa, 
+        key=f"portaria_reg_{st.session_state.contador_reset}"
+    )
     
     col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
@@ -112,7 +121,12 @@ with col_esquerda:
                 "Nome do Aluno": nome_aluno,
                 "Movimento": tipo_movimento
             })
-            st.success(f"✅ Registada {tipo_movimento} para {nome_aluno}")
+            
+            # Alerta temporário antes de limpar
+            st.toast(f"✅ Registada {tipo_movimento} para {nome_aluno}", icon="💾")
+            
+            # Altera o contador para fazer a caixa voltar imediatamente a ficar vazia
+            st.session_state.contador_reset += 1
             st.rerun()
 
 with col_direita:
@@ -123,7 +137,7 @@ with col_direita:
     else:
         st.info("Nenhum movimento registado neste turno.")
 
-# --- BOTÕES DE EXPORTAÇÃO CORRIGIDOS E SEMPRE VISÍVEIS ---
+# --- BOTÕES DE EXPORTAÇÃO ---
 st.write("---")
 st.write("### ⬇️ Exportar Relatório de Final de Dia")
 
@@ -151,21 +165,9 @@ def gerar_pdf(dados):
             Paragraph(f"<b>{r.get('Movimento', '-')}</b>", estilo_texto)
         ])
     
-    tabela = Table(dados_tab, colWidths=[120, 80, 220, 80])
+    tabela = Table(dados_tab, colWidths=[120, 80, 200, 80])
     tabela.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1E3A8A')),
         ('ALIGN', (0,0), (-1,-1), 'LEFT'),
         ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#F3F4F6')]),
         ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E5E7EB')),
-        ('TOPPADDING', (0,0), (-1,-1), 6),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
-    ]))
-    elementos.append(tabela)
-    doc.build(elementos)
-    buffer.seek(0)
-    return buffer
-
-col_btn_pdf, col_btn_excel = st.columns(2)
-with col_btn_pdf:
-    pdf_bytes = gerar_pdf(st.session_state.livro_registo)
-    st.download_button(label="📄 Descarregar Relatório Completo em PDF", data=pdf_bytes, file_name="relatorio_turno.pdf", mime="application/pdf", use_container_width=True)
