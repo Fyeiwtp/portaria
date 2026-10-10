@@ -531,44 +531,33 @@ col_esquerda, col_direita = st.columns(2, gap="large")
 
 with col_esquerda:
     st.markdown('<div class="section-title">🔍 Registo de entradas e saídas</div>', unsafe_allow_html=True)
-    termo_pesquisa = st.text_input(
-        "Pesquisar aluno ou quarto:",
-        placeholder="Escreve o nome ou número do quarto...",
-        key="pesquisa_registo_texto",
-    ).strip()
-    escolha = placeholder_pesquisa
-    if termo_pesquisa:
-        correspondencias = [
-            opcao for opcao in opcoes_pesquisa[1:]
-            if termo_pesquisa.casefold() in opcao.casefold()
-        ]
-        if correspondencias:
-            # Resultados limitados para manter os botões sempre à vista.
-            opcoes_visiveis = correspondencias[:6]
-            escolha = st.radio(
-                "Seleciona o aluno:",
-                options=opcoes_visiveis,
-                key="portaria_reg_resultado",
+    st.caption("Pesquise pelo Quarto ou pelo Nome do Aluno para registar:")
+    # A lista abre numa caixa branca; os botões ficam dentro da mesma caixa,
+    # abaixo da lista, sem tapar o histórico nem exigir outra pesquisa.
+    escolha_atual = st.session_state.get("portaria_reg", placeholder_pesquisa)
+    with st.popover(
+        f"⌄  {escolha_atual}",
+        use_container_width=True,
+    ):
+        escolha = st.selectbox(
+            "Selecionar quarto ou aluno",
+            options=opcoes_pesquisa,
+            key="portaria_reg",
+        )
+        col_btn1, col_btn2 = st.columns(2)
+        with col_btn1:
+            entrada = st.button(
+                "📥 Registar ENTRADA",
+                type="primary",
+                use_container_width=True,
+                key="entrada_menu",
             )
-            if len(correspondencias) > 6:
-                st.caption(f"A mostrar 6 de {len(correspondencias)} resultados. Escreve mais letras para filtrar.")
-        else:
-            st.info("Não foi encontrado nenhum aluno ou quarto.")
-    else:
-        st.caption("Escreve para procurar. Os botões ficam visíveis abaixo dos resultados.")
-    col_btn1, col_btn2 = st.columns(2)
-
-    with col_btn1:
-        entrada = st.button(
-            "📥 Registar ENTRADA",
-            type="primary",
-            use_container_width=True,
-        )
-    with col_btn2:
-        saida = st.button(
-            "📤 Registar SAÍDA",
-            use_container_width=True,
-        )
+        with col_btn2:
+            saida = st.button(
+                "📤 Registar SAÍDA",
+                use_container_width=True,
+                key="saida_menu",
+            )
 
     if (entrada or saida) and escolha != placeholder_pesquisa:
         quarto_escolhido = escolha.split(" | ", 1)[0]
