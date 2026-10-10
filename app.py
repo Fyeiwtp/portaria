@@ -1043,3 +1043,58 @@ with st.expander("🗑️ Apagar registos antigos de visitantes"):
 
     if st.session_state.pop("visitantes_apagados", False):
         st.success("Registos de visitantes apagados.")
+
+st.write("---")
+
+with st.expander("⚠️ Reiniciar todos os registos"):
+    st.warning(
+        "Esta operação apaga todos os movimentos, correções, "
+        "check-ins, check-outs, visitantes e relatórios PDF "
+        "guardados no site. Não é possível desfazer."
+    )
+
+    with st.form("form_reiniciar_tudo"):
+        confirmacao_reset = st.text_input(
+            "Escreva APAGAR para confirmar"
+        )
+
+        reiniciar_tudo = st.form_submit_button(
+            "🗑️ Apagar tudo e começar do zero",
+            type="primary",
+        )
+
+    if reiniciar_tudo:
+        if confirmacao_reset.strip() != "APAGAR":
+            st.error("Escreva APAGAR para confirmar.")
+        else:
+            try:
+                with ligar_bd() as conn:
+                    conn.execute("DELETE FROM correcoes_estado")
+                    conn.execute("DELETE FROM movimentos")
+                    conn.execute("DELETE FROM fichas_portaria")
+                    conn.execute("DELETE FROM relatorios_fechados")
+
+            except Exception as exc:
+                st.error(
+                    f"Não foi possível reiniciar os registos: {exc}"
+                )
+            else:
+                falhas_pdf = []
+
+                for ficheiro in PASTA_RELATORIOS.glob(
+                    "relatorio_portaria_*.pdf"
+                ):
+                    try:
+                        ficheiro.unlink()
+                    except OSError:
+                        falhas_pdf.append(ficheiro.name)
+
+                if falhas_pdf:
+                    st.warning(
+                        "Os registos foram apagados, mas alguns "
+                        "PDFs arquivados não puderam ser removidos. "
+                        "Remova-os da pasta relatorios."
+                    )
+                else:
+                    st.session_state.clear()
+                    st.rerun()
