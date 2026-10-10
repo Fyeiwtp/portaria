@@ -527,7 +527,9 @@ st.write("---")
 # ============================================================
 # REGISTO DE ENTRADAS E SAÍDAS
 # ============================================================
-with st.container():
+col_esquerda, col_direita = st.columns(2, gap="large")
+
+with col_esquerda:
     st.markdown('<div class="section-title">🔍 Registo de entradas e saídas</div>', unsafe_allow_html=True)
     escolha = st.selectbox(
         "Pesquise pelo Quarto ou pelo Nome do Aluno para registar:",
@@ -564,22 +566,18 @@ with st.container():
     elif (entrada or saida) and escolha == placeholder_pesquisa:
         st.warning("Selecione primeiro um quarto/aluno.")
 
-st.write("---")
-st.markdown('<div class="section-title">🕒 Histórico de movimentos</div>', unsafe_allow_html=True)
-st.caption("Todos os movimentos do dia operacional atual, do mais recente para o mais antigo.")
-periodo_atual = periodo_operacional()
-df_atual = carregar_movimentos(periodo_atual)
-if not df_atual.empty:
-    tabela_historico = df_atual[["Data/Hora", "Quarto", "Nome do Aluno", "Movimento", "Origem"]].iloc[::-1]
-    st.dataframe(
-        tabela_historico,
-        use_container_width=True,
-        hide_index=True,
-        height=38 + len(tabela_historico) * 35,
-    )
-    st.caption(f"Total: {len(tabela_historico)} movimentos neste dia operacional.")
-else:
-    st.info("Nenhum movimento registado no período operacional atual.")
+with col_direita:
+    st.markdown('<div class="section-title">🕒 Histórico de movimentos</div>', unsafe_allow_html=True)
+    periodo_atual = periodo_operacional()
+    df_atual = carregar_movimentos(periodo_atual)
+    if not df_atual.empty:
+        st.dataframe(
+            df_atual[["Data/Hora", "Quarto", "Nome do Aluno", "Movimento", "Origem"]].iloc[::-1],
+            use_container_width=True,
+            height=650,
+        )
+    else:
+        st.info("Nenhum movimento registado no período operacional atual.")
 
 # ============================================================
 # RELATÓRIOS E EXPORTAÇÕES
