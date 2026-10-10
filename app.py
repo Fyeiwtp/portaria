@@ -8,6 +8,10 @@ from zoneinfo import ZoneInfo
 import html
 import time
 import hmac
+import json
+import base64
+import streamlit.components.v1 as components
+from formularios_portaria import criar_ficha_pdf
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
@@ -611,6 +615,144 @@ st.caption("Estados baseados nos registos e correções introduzidos; podem dife
 
 st.write("---")
 
+
+# Fichas independentes dos movimentos diários; mantém o histórico existente.
+def inicializar_fichas():
+    with ligar_bd() as conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS fichas_portaria (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tipo TEXT NOT NULL, dados TEXT NOT NULL,
+            criado_em TEXT NOT NULL, vigilante TEXT NOT NULL,
+            pdf BLOB NOT NULL, saida_em TEXT
+        )""")
+
+
+inicializar_fichas()
+
+
+def guardar_ficha(tipo, valores):
+    momento = agora_local().strftime('%d/%m/%Y %H:%M:%S')
+    pdf = criar_ficha_pdf(tipo, valores, FUNCIONARIO_ATUAL, momento)
+    with ligar_bd() as conn:
+        cursor = conn.execute(
+            'INSERT INTO fichas_portaria (tipo, dados, criado_em, vigilante, pdf) VALUES (?, ?, ?, ?, ?)',
+            (tipo, json.dumps(valores, ensure_ascii=False), momento, FUNCIONARIO_ATUAL, pdf))
+        ficha_id = cursor.lastrowid
+    nome = f"{tipo.lower().replace('-', '_')}_{ficha_id}.pdf"
+    st.session_state['ficha_download'] = {'pdf': pdf, 'nome': nome, 'token': f'{ficha_id}_novo'}
+
+
+def mostrar_formulario_residente(tipo, prefixo):
+    with st.expander(f'📋 Ficha de {tipo}'):
+        st.caption('Preencha a ficha e guarde para gerar o PDF. Saída pode indicar a data prevista ou efetiva.')
+        with st.form(f'form_{prefixo}'):
+            nome = st.text_input('Nome', key=f'{prefixo}_nome', max_chars=150)
+            quarto = st.text_input('Quarto', key=f'{prefixo}_quarto', max_chars=30)
+            chave = st.text_input('Chave', key=f'{prefixo}_chave', max_chars=60,
+                                  placeholder='Número da chave / entregue / devolvida')
+            saida = st.text_input('Saída', key=f'{prefixo}_saida', max_chars=100,
+                                  placeholder='Data de saída prevista ou efetiva')
+            hora = st.time_input('Hora', value=agora_local().time().replace(tzinfo=None), key=f'{prefixo}_hora')
+            guardar = st.form_submit_button(f'Guardar {tipo} e gerar PDF', type='primary')
+        if guardar:
+            if not nome.strip() or not quarto.strip():
+                st.error('Preencha o nome e o quarto.')
+            else:
+                guardar_ficha(tipo, {'Nome': nome.strip(), 'Chave': chave.strip(),
+                    'Saída': saida.strip(), 'Quarto': quarto.strip(), 'Hora': hora.strftime('%H:%M')})
+                st.success('Ficha guardada. O PDF está disponível abaixo.')
+        st.download_button('Descarregar modelo em branco', criar_ficha_pdf(tipo),
+                           f'modelo_{prefixo}.pdf', 'application/pdf', key=f'blank_{prefixo}')
+
+
+def mostrar_visitantes():
+    st.markdown('<div class="section-title">👥 Visitantes</div>', unsafe_allow_html=True)
+    with st.container(border=True):
+        with st.form('form_visitante'):
+            a, b = st.columns(2)
+            with a:
+                nome = st.text_input('Nome do visitante', max_chars=150)
+                identificacao = st.text_input('Identificação', max_chars=100)
+                visitado = st.text_input('Visitado', max_chars=150)
+            with b:
+                quarto = st.text_input('Quarto visitado', max_chars=30)
+                data_entrada = st.date_input('Data de entrada', value=agora_local().date(), format='DD/MM/YYYY')
+                hora_entrada = st.time_input('Hora de entrada', value=agora_local().time().replace(tzinfo=None))
+            guardar = st.form_submit_button('Guardar entrada do visitante e gerar PDF', type='primary')
+        if guardar:
+            if not all(v.strip() for v in (nome, identificacao, visitado, quarto)):
+                st.error('Preencha nome, identificação, visitado e quarto.')
+            elif datetime.combine(data_entrada, hora_entrada) > agora_local().replace(tzinfo=None):
+                st.error('A entrada não pode estar no futuro.')
+            else:
+                entrada = datetime.combine(data_entrada, hora_entrada).strftime('%d/%m/%Y %H:%M:%S')
+                guardar_ficha('Visitantes', {'Nome': nome.strip(), 'Identificação': identificacao.strip(),
+                    'Visitado': visitado.strip(), 'Quarto': quarto.strip(), 'Entrada': entrada, 'Saída': ''})
+                st.success('Entrada guardada. Registe a saída quando a visita terminar.')
+        st.download_button('Descarregar modelo de visitantes em branco', criar_ficha_pdf('Visitantes'),
+            'modelo_visitantes.pdf', 'application/pdf', key='blank_visitantes')
+        with ligar_bd() as conn:
+            pendentes = conn.execute("SELECT * FROM fichas_portaria WHERE tipo = 'Visitantes' AND saida_em IS NULL ORDER BY id DESC").fetchall()
+        if pendentes:
+            por_id = {r['id']: r for r in pendentes}
+            ficha_id = st.selectbox('Visitante com saída pendente', list(por_id),
+                format_func=lambda i: f"#{i} | {json.loads(por_id[i]['dados'])['Nome']} | {json.loads(por_id[i]['dados'])['Quarto']}")
+            if st.button('Registar saída do visitante e gerar PDF', type='primary'):
+                valores = json.loads(por_id[ficha_id]['dados'])
+                momento = agora_local().strftime('%d/%m/%Y %H:%M:%S')
+                valores['Saída'] = momento
+                pdf = criar_ficha_pdf('Visitantes', valores, FUNCIONARIO_ATUAL, momento)
+                with ligar_bd() as conn:
+                    atualizado = conn.execute("UPDATE fichas_portaria SET dados = ?, pdf = ?, saida_em = ? WHERE id = ? AND saida_em IS NULL",
+                        (json.dumps(valores, ensure_ascii=False), pdf, momento, ficha_id))
+                if atualizado.rowcount:
+                    st.session_state['ficha_download'] = {'pdf': pdf, 'nome': f'visitantes_{ficha_id}_saida.pdf', 'token': f'{ficha_id}_saida'}
+                    st.rerun()
+                else:
+                    st.warning('A saída já foi registada. Atualize a página.')
+        else:
+            st.info('Não há visitantes com saída pendente.')
+
+
+def mostrar_download_ficha():
+    recente = st.session_state.get('ficha_download')
+    if recente:
+        st.download_button('⬇️ Descarregar PDF da última ficha', recente['pdf'], recente['nome'],
+            'application/pdf', key='download_ficha_recente')
+        if st.session_state.get('download_tentado') != recente['token']:
+            st.session_state['download_tentado'] = recente['token']
+            conteudo = base64.b64encode(recente['pdf']).decode('ascii')
+            # Tentativa única; o botão acima é a alternativa em navegadores que bloqueiam.
+            components.html(f"""<script>
+                const raw = atob({json.dumps(conteudo)});
+                const bytes = Uint8Array.from(raw, c => c.charCodeAt(0));
+                const url = URL.createObjectURL(new Blob([bytes], {{type: 'application/pdf'}}));
+                const a = document.createElement('a');
+                a.href = url; a.download = {json.dumps(recente['nome'])};
+                document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 10000);
+            </script>""", height=0)
+        st.caption('A descarga automática depende do navegador. Se não iniciar, use o botão acima.')
+    with st.expander('📁 Histórico de fichas e PDFs'):
+        with ligar_bd() as conn:
+            fichas = conn.execute('SELECT * FROM fichas_portaria ORDER BY id DESC').fetchall()
+        if not fichas:
+            st.info('Ainda não existem fichas guardadas.')
+        else:
+            linhas = []
+            for r in fichas:
+                dados = json.loads(r['dados'])
+                linhas.append({'N.º': r['id'], 'Tipo': r['tipo'], 'Nome': dados.get('Nome', ''),
+                    'Quarto': dados.get('Quarto', ''), 'Data': r['criado_em'],
+                    'Vigilante': r['vigilante'], 'Saída': dados.get('Saída', '')})
+            st.dataframe(pd.DataFrame(linhas), hide_index=True, use_container_width=True)
+            mapa = {r['id']: r for r in fichas}
+            escolhido = st.selectbox('Ficha para descarregar', list(mapa),
+                format_func=lambda i: f"#{i} | {mapa[i]['tipo']} | {json.loads(mapa[i]['dados'])['Nome']}")
+            st.download_button('Descarregar PDF guardado', bytes(mapa[escolhido]['pdf']),
+                f'ficha_{escolhido}.pdf', 'application/pdf', key='download_historico_ficha')
+
+
 # ============================================================
 # REGISTO DE ENTRADAS E SAÍDAS
 # ============================================================
@@ -730,6 +872,13 @@ with col_esquerda:
             args=("SAÍDA",),
         )
 
+    # As fichas de alojamento são independentes das entradas/saídas diárias.
+    ficha_esquerda, ficha_direita = st.columns(2)
+    with ficha_esquerda:
+        mostrar_formulario_residente('Check-in', 'check_in')
+    with ficha_direita:
+        mostrar_formulario_residente('Check-out', 'check_out')
+
     aviso = st.session_state.pop("aviso_registo", None)
     if aviso:
         tipo_aviso, mensagem = aviso
@@ -752,6 +901,9 @@ with col_direita:
         )
     else:
         st.info("Nenhum movimento registado no período operacional atual.")
+
+mostrar_visitantes()
+mostrar_download_ficha()
 
 # ============================================================
 # RELATÓRIOS E EXPORTAÇÕES
@@ -822,3 +974,58 @@ st.sidebar.info(
     "Os registos são guardados no ficheiro portaria_registos.sqlite3. "
     "Faça cópias de segurança desse ficheiro regularmente."
 )
+from io import BytesIO
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.utils import simpleSplit
+
+CAMPOS = {
+    'Check-in': ['Nome', 'Chave', 'Saída', 'Quarto', 'Hora'],
+    'Check-out': ['Nome', 'Chave', 'Saída', 'Quarto', 'Hora'],
+    'Visitantes': ['Nome', 'Identificação', 'Visitado', 'Quarto', 'Entrada', 'Saída'],
+}
+
+def criar_ficha_pdf(tipo, valores=None, vigilante='', data=''):
+    """Ficha A4: em branco é interativa; preenchida é um comprovativo."""
+    valores = valores or {}
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    largura, altura = A4
+    c.setTitle('Portaria - ' + tipo)
+    c.setFillColor(colors.HexColor('#12213a'))
+    c.rect(0, altura - 108, largura, 108, fill=1, stroke=0)
+    c.setFillColor(colors.white)
+    c.setFont('Helvetica-Bold', 22)
+    c.drawString(40, altura - 55, 'PORTARIA RESIDENCIAL')
+    c.setFont('Helvetica', 14)
+    c.drawString(40, altura - 82, 'Ficha de ' + tipo)
+    c.setFillColor(colors.HexColor('#12213a'))
+    c.setFont('Helvetica', 10)
+    c.drawString(40, altura - 137, 'Data: ' + (data or '____ / ____ / ________'))
+    y = altura - 190
+    for i, campo in enumerate(CAMPOS[tipo]):
+        c.setFont('Helvetica-Bold', 11)
+        c.drawString(40, y + 12, campo)
+        if not valores:
+            c.acroForm.textfield(name=f'campo_{i}', tooltip=campo,
+                x=40, y=y-31, width=largura-80, height=34,
+                borderWidth=1, borderStyle='solid', forceBorder=True,
+                borderColor=colors.HexColor('#cbd5e1'),
+                fillColor=colors.HexColor('#f8fafc'), fontSize=11,
+                maxlen=200)
+        else:
+            c.setStrokeColor(colors.HexColor('#cbd5e1'))
+            c.roundRect(40, y-31, largura-80, 34, 4, stroke=1, fill=0)
+            c.setFont('Helvetica', 10)
+            lines = simpleSplit(str(valores.get(campo, '')), 'Helvetica', 10, largura-100)
+            for j, line in enumerate(lines[:2]):
+                c.drawString(50, y-10-j*12, line)
+        y -= 78
+    c.setFont('Helvetica', 10)
+    c.drawString(40, 100, 'Vigilante: ' + vigilante)
+    c.drawString(40, 70, 'Assinatura: __________________________________________')
+    c.setFont('Helvetica', 8)
+    c.drawString(40, 35, 'Ficha de portaria | Guarde uma cópia após o preenchimento.')
+    c.save()
+    return buffer.getvalue()
