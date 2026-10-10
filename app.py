@@ -531,66 +531,31 @@ col_esquerda, col_direita = st.columns(2, gap="large")
 
 with col_esquerda:
     st.markdown('<div class="section-title">🔍 Registo de entradas e saídas</div>', unsafe_allow_html=True)
-    # Pesquisa instantânea: componente próprio com sugestões a cada tecla,
-    # sem Enter e sem um segundo campo de pesquisa.
-    from streamlit_searchbox import st_searchbox
+    # Pesquisa nativa do Streamlit: sugestões aparecem ao escrever,
+    # sem Enter e sem dependências adicionais.
     import unicodedata
 
+    def normalizar_pesquisa(valor):
+        texto = unicodedata.normalize("NFKD", str(valor or ""))
+        return "".join(c for c in texto if not unicodedata.combining(c)).casefold()
+
     mapa_quartos = {str(r["Numero"]).strip().upper(): str(r["Nome"]) for _, r in alunos_db.iterrows()}
-
-    def normalizar(texto):
-        texto = unicodedata.normalize("NFKD", str(texto or ""))
-        return "".join(c for c in texto if not unicodedata.combining(c)).casefold().strip()
-
-    def procurar_quartos(termo):
-        termo = normalizar(termo).replace("quarto ", "").replace(" ", "")
-        if not termo:
-            return []
-        return [f"{quarto} | {nome}" for quarto, nome in mapa_quartos.items()
-                if termo in normalizar(quarto).replace(" ", "")][:15]
-
-    def procurar_nomes(termo):
-        termo = normalizar(termo)
-        if not termo:
-            return []
-        encontrados = [(quarto, nome) for quarto, nome in mapa_quartos.items()
-                      if termo in normalizar(nome)]
-        encontrados.sort(key=lambda par: (not normalizar(par[1]).startswith(termo), normalizar(par[1])))
-        return [f"{nome} | Quarto {quarto}" for quarto, nome in encontrados[:20]]
-
-    st.caption("As sugestões aparecem enquanto escreves — não precisas de carregar em Enter.")
-    st.markdown("**🔢 Número do quarto**")
-    selecao_quarto = st_searchbox(
-        procurar_quartos,
-        placeholder="Escreve o número do quarto (ex.: 229A)…",
-        key="quarto_instantaneo",
-        clear_on_submit=False,
+    opcoes_registo = ["-- Escolhe um aluno ou escreve o nome/quarto --"] + [
+        f"{nome} | Quarto {quarto}" for quarto, nome in mapa_quartos.items()
+    ]
+    escolha_registo = st.selectbox(
+        "🔎 Nome do aluno ou número do quarto",
+        options=opcoes_registo,
+        index=0,
+        key="pesquisa_registo_unica",
+        help="Clica no campo e começa a escrever o nome ou o número do quarto. A lista filtra imediatamente, sem Enter.",
     )
-    st.markdown("**👤 Nome do aluno**")
-    selecao_nome = st_searchbox(
-        procurar_nomes,
-        placeholder="Escreve o nome e escolhe a sugestão…",
-        key="nome_instantaneo",
-        clear_on_submit=False,
-    )
-
-    if selecao_quarto:
-        quarto_novo = selecao_quarto.split(" | ", 1)[0]
-        if quarto_novo != st.session_state.get("ultima_selecao_quarto"):
-            st.session_state["aluno_selecionado_quarto"] = quarto_novo
-            st.session_state["ultima_selecao_quarto"] = quarto_novo
-    if selecao_nome:
-        quarto_novo = selecao_nome.rsplit(" | Quarto ", 1)[-1]
-        if quarto_novo != st.session_state.get("ultima_selecao_nome"):
-            st.session_state["aluno_selecionado_quarto"] = quarto_novo
-            st.session_state["ultima_selecao_nome"] = quarto_novo
-
-    quarto_escolhido = st.session_state.get("aluno_selecionado_quarto")
-    if quarto_escolhido in mapa_quartos:
-        st.success(f"**Selecionado: {mapa_quartos[quarto_escolhido]} — Quarto {quarto_escolhido}**")
+    if escolha_registo != opcoes_registo[0]:
+        quarto_escolhido = escolha_registo.rsplit(" | Quarto ", 1)[-1]
+        st.success(f"**{mapa_quartos[quarto_escolhido]} — Quarto {quarto_escolhido}**")
     else:
         quarto_escolhido = None
-        st.caption("Seleciona uma sugestão para ativar o registo.")
+        st.caption("Clica na caixa e escreve o nome ou o quarto para veres as sugestões imediatamente.")
 
     col_btn1, col_btn2 = st.columns(2)
 
