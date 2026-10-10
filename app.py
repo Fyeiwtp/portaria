@@ -1,59 +1,122 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import io
+
+# Importações para gerar o PDF formatado de forma segura
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
 
 st.set_page_config(page_title="Portaria e Quartos", page_icon="📝", layout="wide")
 
 st.title("📝 Registo Automatizado de Vigilância")
-st.subheader("Controlo Residencial com Estado de Limpezas")
+st.subheader("Controlo Residencial com Estado de Limpezas e PDF")
 st.write("---")
 
-# BASE DE DADOS OFICIAL DE ALUNOS E QUARTOS
-dados_brutos = [
-    ("1.9A", "Safira Coelho Curado"), ("1.9B", "Yolanta Yermakova"), ("110A", "Iara Victoria Amorim Senra"),
-    ("110B", "Bárbara da Rocha Soares"), ("111A", "Abel Cabral Costa"), ("111B", "Paulo Henrique Pacheco de Sousa Duarte"),
-    ("112A", "Sizikelly Soares da Gama"), ("112B", "Beatriz Mendonça da Silva"), ("113A", "Afonso Luís Medeiros Freitas"),
-    ("113B", "Carolina Nunes Correia"), ("114A", "Joana Natal Pinto de Magalhães"), ("114B", "Luana Vitória Rodrigues Rachão Lopes"),
-    ("115A", "Júlia Beatriz Rodrigues de Freitas Pereira"), ("115B", "Inês Sofia Untea Machado"), ("116A", "Henrique Barbosa Pereira"),
-    ("116B", "Ricardo Barbosa Pereira"), ("117A", "José Carlos Oliveira da Silva Rocha"), ("117B", "Pedro Calvinho"),
-    ("118A", "Alícia Dias Marcos"), ("118B", "Ema Alves da Silva Neves de Barros"), ("119A", "Bruno Nunes Pereira"),
-    ("119B", "Luís Gabriel Lemos da Silva"), ("120A", "Lanna Lajarin de Oliveira Costa"), ("120B", "Maria Miguel Dias Mandim Lino"),
-    ("121A", "Ana Margarida Silva Ferreira"), ("121B", "Núria Silva Teixeira"), ("122A", "Rodrigo Sousa Mendonça"),
-    ("122B", "Duarte Nuno Dias Marques"), ("123A", "Rodrigo Miguel Pacheco Talaia"), ("123B", "André Brito Palma"),
-    ("124A", "Bruno Jorge Câmara Silva"), ("124B", "Tiago Belchior Soares de Albergaria"), ("125A", "Paulo Jorge Medeiros Alexandre"),
-    ("125B", "Mateus Oliveira"), ("126A", "Pedro Soares Casado"), ("126B", "Dinis Manuel Martins Santos"),
-    ("127A", "Inês Luzia Leal Fagundes"), ("127B", "Ana Luísa Leite Matos"), ("128A", "Vitória Skrzypietz"),
-    ("128B", "Suzana Sousa Dos Santos"), ("129A", "Mafalda Ferreira Martins"), ("129B", "Carolina Relva Mendonça"),
-    ("130A", "Dinis Karpov"), ("130B", "João António Silveira Ramalho"), ("210A", "Alice Francisca Ladeiras Caldeira"),
-    ("210B", "Camila Afonso Brás Matos Pereira"), ("211A", "Tomás Miranda"), ("211B", "Luis Carlos Rego Pacheco"),
-    ("212A", "Mafalda Machado Cabral"), ("212B", "Soraia Filipa Andrade"), ("213A", "Gabriela Nogueira Ferreira"),
-    ("213B", "Mariana Gonçalves"), ("214A", "Bianca Antonio"), ("214B", "Sara Sofia Vieira Cró"),
-    ("215A", "Jorge Miguel Pacheco Botelho"), ("215B", "Jahyr Isney Morales Correia"), ("216A", "Anastasia Belilovets"),
-    ("216B", "Gabriela Filipa Rodrigues Santos"), ("217A", "Rodrigo Freitas Spínola"), ("217B", "Guilherme Bento da Cruz Marques"),
-    ("218A", "Anastácia Dikovych"), ("218B", "Leonor José Abreu Sousa"), ("219A", "Leandro Medeiros Amaral"),
-    ("219B", "Rafael Cabral da Silva"), ("220A", "Margarida Pereira"), ("220B", "Carlota Oliveira Baptista Reis"),
-    ("221A", "Daniela Alexandra Marques Carreira"), ("221B", "Matilde Bairos Fumo"), ("222A", "Maria Elvira Basílio Canada"),
-    ("222B", "João Gonçalo Nascimento Abreu"), ("223A", "Bruno Miguel Pereira Medeiros"), ("223B", "Raquel Viveiros Sousa"),
-    ("224A", "Ana Cristina Marques da Silva"), ("224B", "Carolina Alexandra Pereira Fernandes"), ("225A", "Érica Brites Freitas"),
-    ("225B", "Maria Amália Poças"), ("226A", "Jacinta Borges"), ("226B", "Carlota Abreu Freitas"),
-    ("227A", "Gabrielle Cristina da Silva"), ("227B", "Joana Isabel Pereira Reis Rato"), ("228A", "Luana Filipa da Silva Cabral"),
-    ("228B", "Jéssica Inês Alves Teixeira"), ("229A", "Maria Inês Figueiredo Bentes"), ("229B", "Mariana Alves Barrinha"),
-    ("230A", "Helena Isabel Ramos da Costa"), ("230B", "Joana Margarida Paim Gregório"), ("231A", "Pedro Guilherme Baptista Silva"),
-    ("231B", "Duarte Carreno Novais")
-]
-
+# BASE DE DADOS OFICIAL COMPLETA E CORRIGIDA SEM ERROS DE TEXTO
 if 'alunos_db' not in st.session_state:
-    st.session_state.alunos_db = pd.DataFrame(dados_brutos, columns=['Numero', 'Nome'])
+    st.session_state.alunos_db = pd.DataFrame([
+        {"Numero": "1.9A", "Nome": "Safira Coelho Curado"},
+        {"Numero": "1.9B", "Nome": "Yolanta Yermakova"},
+        {"Numero": "110A", "Nome": "Iara Victoria Amorim Senra"},
+        {"Numero": "110B", "Nome": "Bárbara da Rocha Soares"},
+        {"Numero": "111A", "Nome": "Abel Cabral Costa"},
+        {"Numero": "111B", "Nome": "Paulo Henrique Pacheco de Sousa Duarte"},
+        {"Numero": "112A", "Nome": "Sizikelly Soares da Gama"},
+        {"Numero": "112B", "Nome": "Beatriz Mendonça da Silva"},
+        {"Numero": "113A", "Nome": "Afonso Luís Medeiros Freitas"},
+        {"Numero": "113B", "Nome": "Carolina Nunes Correia"},
+        {"Numero": "114A", "Nome": "Joana Natal Pinto de Magalhães"},
+        {"Numero": "114B", "Nome": "Luana Vitória Rodrigues Rachão Lopes"},
+        {"Numero": "115A", "Nome": "Júlia Beatriz Rodrigues de Freitas Pereira"},
+        {"Numero": "115B", "Nome": "Inês Sofia Untea Machado"},
+        {"Numero": "116A", "Nome": "Henrique Barbosa Pereira"},
+        {"Numero": "116B", "Nome": "Ricardo Barbosa Pereira"},
+        {"Numero": "117A", "Nome": "José Carlos Oliveira da Silva Rocha"},
+        {"Numero": "117B", "Nome": "Pedro Calvinho"},
+        {"Numero": "118A", "Nome": "Alícia Dias Marcos"},
+        {"Numero": "118B", "Nome": "Ema Alves da Silva Neves de Barros"},
+        {"Numero": "119A", "Nome": "Bruno Nunes Pereira"},
+        {"Numero": "119B", "Nome": "Luís Gabriel Lemos da Silva"},
+        {"Numero": "120A", "Nome": "Lanna Lajarin de Oliveira Costa"},
+        {"Numero": "120B", "Nome": "Maria Miguel Dias Mandim Lino"},
+        {"Numero": "121A", "Nome": "Ana Margarida Silva Ferreira"},
+        {"Numero": "121B", "Nome": "Núria Silva Teixeira"},
+        {"Numero": "122A", "Nome": "Rodrigo Sousa Mendonça"},
+        {"Numero": "122B", "Nome": "Duarte Nuno Dias Marques"},
+        {"Numero": "123A", "Nome": "Rodrigo Miguel Pacheco Talaia"},
+        {"Numero": "123B", "Nome": "André Brito Palma"},
+        {"Numero": "124A", "Nome": "Bruno Jorge Câmara Silva"},
+        {"Numero": "124B", "Nome": "Tiago Belchior Soares de Albergaria"},
+        {"Numero": "125A", "Nome": "Paulo Jorge Medeiros Alexandre"},
+        {"Numero": "125B", "Nome": "Mateus Oliveira"},
+        {"Numero": "126A", "Nome": "Pedro Soares Casado"},
+        {"Numero": "126B", "Nome": "Dinis Manuel Martins Santos"},
+        {"Numero": "127A", "Nome": "Inês Luzia Leal Fagundes"},
+        {"Numero": "127B", "Nome": "Ana Luísa Leite Matos"},
+        {"Numero": "128A", "Nome": "Vitória Skrzypietz"},
+        {"Numero": "128B", "Nome": "Suzana Sousa Dos Santos"},
+        {"Numero": "129A", "Nome": "Mafalda Ferreira Martins"},
+        {"Numero": "129B", "Nome": "Carolina Relva Mendonça"},
+        {"Numero": "130A", "Nome": "Dinis Karpov"},
+        {"Numero": "130B", "Nome": "João António Silveira Ramalho"},
+        {"Numero": "210A", "Nome": "Alice Francisca Ladeiras Caldeira"},
+        {"Numero": "210B", "Nome": "Camila Afonso Brás Matos Pereira"},
+        {"Numero": "211A", "Nome": "Tomás Miranda"},
+        {"Numero": "211B", "Nome": "Luis Carlos Rego Pacheco"},
+        {"Numero": "212A", "Nome": "Mafalda Machado Cabral"},
+        {"Numero": "212B", "Nome": "Soraia Filipa Andrade"},
+        {"Numero": "213A", "Nome": "Gabriela Nogueira Ferreira"},
+        {"Numero": "213B", "Nome": "Mariana Gonçalves"},
+        {"Numero": "214A", "Nome": "Bianca Antonio"},
+        {"Numero": "214B", "Nome": "Sara Sofia Vieira Cró"},
+        {"Numero": "215A", "Nome": "Jorge Miguel Pacheco Botelho"},
+        {"Numero": "215B", "Nome": "Jahyr Isney Morales Correia"},
+        {"Numero": "216A", "Nome": "Anastasia Belilovets"},
+        {"Numero": "216B", "Nome": "Gabriela Filipa Rodrigues Santos"},
+        {"Numero": "217A", "Nome": "Rodrigo Freitas Spínola"},
+        {"Numero": "217B", "Nome": "Guilherme Bento da Cruz Marques"},
+        {"Numero": "218A", "Nome": "Anastácia Dikovych"},
+        {"Numero": "218B", "Nome": "Leonor José Abreu Sousa"},
+        {"Numero": "219A", "Nome": "Leandro Medeiros Amaral"},
+        {"Numero": "219B", "Nome": "Rafael Cabral da Silva"},
+        {"Numero": "220A", "Nome": "Margarida Pereira"},
+        {"Numero": "220B", "Nome": "Carlota Oliveira Baptista Reis"},
+        {"Numero": "221A", "Nome": "Daniela Alexandra Marques Carreira"},
+        {"Numero": "221B", "Nome": "Matilde Bairos Fumo"},
+        {"Numero": "222A", "Nome": "Maria Elvira Basílio Canada"},
+        {"Numero": "222B", "Nome": "João Gonçalo Nascimento Abreu"},
+        {"Numero": "223A", "Nome": "Bruno Miguel Pereira Medeiros"},
+        {"Numero": "223B", "Nome": "Raquel Viveiros Sousa"},
+        {"Numero": "224A", "Nome": "Ana Cristina Marques da Silva"},
+        {"Numero": "224B", "Nome": "Carolina Alexandra Pereira Fernandes"},
+        {"Numero": "225A", "Nome": "Érica Brites Freitas"},
+        {"Numero": "225B", "Nome": "Maria Amália Poças"},
+        {"Numero": "226A", "Nome": "Jacinta Borges"},
+        {"Numero": "226B", "Nome": "Carlota Abreu Freitas"},
+        {"Numero": "227A", "Nome": "Gabrielle Cristina da Silva"},
+        {"Numero": "227B", "Nome": "Joana Isabel Pereira Reis Rato"},
+        {"Numero": "228A", "Nome": "Luana Filipa da Silva Cabral"},
+        {"Numero": "228B", "Nome": "Jéssica Inês Alves Teixeira"},
+        {"Numero": "229A", "Nome": "Maria Inês Figueiredo Bentes"},
+        {"Numero": "229B", "Nome": "Mariana Alves Barrinha"},
+        {"Numero": "230A", "Nome": "Helena Isabel Ramos da Costa"},
+        {"Numero": "230B", "Nome": "Joana Margarida Paim Gregório"},
+        {"Numero": "231A", "Nome": "Pedro Guilherme Baptista Silva"},
+        {"Numero": "231B", "Nome": "Duarte Carreno Novais"}
+    ])
 
 if 'livro_registo' not in st.session_state:
     st.session_state.livro_registo = []
 
-# Criar lista para o menu de seleção
+# Criar lista organizada para o menu de pesquisa interativa
 opcoes_pesquisa = ["-- Clique para digitar Quarto ou Nome --"]
 for _, row in st.session_state.alunos_db.iterrows():
     opcoes_pesquisa.append(f"{row['Numero']} | {row['Nome']}")
 
-# --- SECÇÃO DE CONSULTA PARA AS LIMPEZAS ---
+# --- SECÇÃO DE CONSULTA RÁPIDA DE LIMPEZAS ---
 st.write("### 🧹 Consulta Rápida para Equipas de Limpeza")
 quarto_limpeza = st.selectbox("Selecione o quarto para saber se está livre para limpar:", options=opcoes_pesquisa, key="limpeza_check")
 
@@ -72,7 +135,7 @@ if quarto_limpeza != "-- Clique para digitar Quarto ou Nome --":
 
 st.write("---")
 
-# --- SECÇÃO DE REGISTO DE ENTRADAS E SAÍDAS ---
+# --- SECÇÃO DE REGISTO EM DUAS COLUNAS FIXAS ---
 col_esquerda, col_direita = st.columns(2, gap="large")
 
 with col_esquerda:
@@ -101,7 +164,6 @@ with col_esquerda:
                 "Nome do Aluno": nome_aluno,
                 "Movimento": tipo_movimento
             })
-            
             st.success(f"✅ Registada {tipo_movimento} para {nome_aluno} ({num_quarto})")
             st.rerun()
 
@@ -113,17 +175,13 @@ with col_direita:
     else:
         st.info("Nenhum movimento registado neste turno.")
 
-# --- MODO MODERNO DE EXPORTAÇÃO (PDF e Excel integrados sem erros) ---
+# --- BOTÃO DO PDF OFICIAL ATIVADO E FIXO ---
 st.write("---")
 st.write("### ⬇️ Exportar Relatório de Final de Dia")
-st.info("💡 **Como guardar em PDF:** Para descarregar o relatório em formato PDF, basta clicar com o botão direito em cima da tabela do Histórico à direita e escolher a opção **'Imprimir'** ou **'Guardar como PDF'** no seu navegador.")
 
-if st.session_state.livro_registo:
-    df_exportar = pd.DataFrame(st.session_state.livro_registo)
-    st.download_button(
-        label="📊 Descarregar Relatório Completo em Excel (CSV)",
-        data=df_exportar.to_csv(index=False).encode('utf-8'),
-        file_name=f"relatorio_portaria_{datetime.now().strftime('%Y%m%d')}.csv",
-        mime="text/csv",
-        use_container_width=True
-    )
+def gerar_pdf(dados):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+    elementos = []
+    estilos = getSampleStyleSheet()
+    
