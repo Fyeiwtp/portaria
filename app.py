@@ -35,10 +35,45 @@ BASE_DADOS = Path(__file__).with_name("portaria_registos.sqlite3")
 PASTA_RELATORIOS = Path(__file__).with_name("relatorios")
 PASTA_RELATORIOS.mkdir(parents=True, exist_ok=True)
 
-st.title("📝 Registo Automatizado de Vigilância")
-st.subheader("Controlo Residencial com registos permanentes, limpeza e PDF")
-st.caption("Os movimentos são guardados numa base de dados local e não desaparecem ao atualizar a página.")
-st.write("---")
+# ============================================================
+# DESIGN / INTERFACE
+# ============================================================
+st.markdown("""
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  :root { --navy:#12213a; --blue:#2563eb; --muted:#64748b; --line:#e2e8f0; }
+  html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+  .stApp { background: #f4f7fb; }
+  [data-testid="stHeader"] { background: rgba(244,247,251,.9); }
+  .block-container { padding-top: 1.6rem; padding-bottom: 3rem; max-width: 1500px; }
+  [data-testid="stSidebar"] { background: #101d33; }
+  [data-testid="stSidebar"] * { color: #e7eefb !important; }
+  .hero { padding: 1.55rem 1.8rem; border-radius: 22px; color: white;
+          background: linear-gradient(120deg,#12213a 0%,#1e40af 62%,#3b82f6 100%);
+          box-shadow: 0 14px 35px rgba(30,64,175,.18); margin-bottom: 1.25rem; }
+  .hero-kicker { font-size:.78rem; text-transform:uppercase; letter-spacing:.14em; opacity:.78; font-weight:700; }
+  .hero h1 { color:white; font-size:2rem; font-weight:800; margin:.35rem 0 .3rem 0; }
+  .hero p { color:#e0eaff; margin:0; font-size:.98rem; }
+  .section-title { color:#12213a; font-size:1.18rem; font-weight:800; margin:1.25rem 0 .7rem 0; }
+  [data-testid="stMetric"] { background:white; padding:1rem 1.1rem; border:1px solid #e5eaf2;
+      border-radius:16px; box-shadow:0 4px 15px rgba(15,23,42,.035); }
+  [data-testid="stMetricLabel"] { color:#64748b; font-weight:600; }
+  [data-testid="stMetricValue"] { color:#12213a; font-weight:800; }
+  div[data-testid="stVerticalBlockBorderWrapper"] { border-radius:16px; }
+  .stButton > button, .stDownloadButton > button { border-radius:11px; font-weight:700; min-height:2.7rem; border:1px solid #dbe4f0; }
+  .stButton > button[kind="primary"] { background:linear-gradient(120deg,#1d4ed8,#2563eb); border:0; }
+  .stSelectbox [data-baseweb="select"] > div, .stTextInput input { border-radius:10px; }
+  [data-testid="stDataFrame"] { border:1px solid #e2e8f0; border-radius:13px; overflow:hidden; }
+  hr { border-color:#e1e8f0; }
+  @media (max-width: 700px) { .hero { padding:1.1rem; } .hero h1 { font-size:1.5rem; } }
+</style>
+<div class="hero">
+  <div class="hero-kicker">Gestão residencial · Portaria</div>
+  <h1>Centro de controlo da portaria</h1>
+  <p>Entradas e saídas, estado dos quartos e relatórios num só lugar.</p>
+</div>
+""", unsafe_allow_html=True)
+st.caption("🔒 Os movimentos ficam guardados numa base de dados local e mantêm-se ao atualizar a página.")
 
 
 # ============================================================
@@ -213,6 +248,19 @@ opcoes_pesquisa = [placeholder_pesquisa] + [
     for _, row in alunos_db.iterrows()
 ]
 
+# Resumo rápido do dia operacional
+_df_resumo = carregar_movimentos(periodo_operacional())
+_total_entradas = int((_df_resumo["Movimento"] == "ENTRADA").sum()) if not _df_resumo.empty else 0
+_total_saidas = int((_df_resumo["Movimento"] == "SAÍDA").sum()) if not _df_resumo.empty else 0
+_total_movimentos = len(_df_resumo)
+st.markdown('<div class="section-title">Visão geral de hoje</div>', unsafe_allow_html=True)
+_m1, _m2, _m3, _m4 = st.columns(4)
+_m1.metric("Quartos na lista", len(alunos_db))
+_m2.metric("Movimentos hoje", _total_movimentos)
+_m3.metric("Entradas", _total_entradas)
+_m4.metric("Saídas", _total_saidas)
+st.write("")
+
 
 # ============================================================
 # PDF VERDADEIRO
@@ -374,7 +422,7 @@ if agora.hour >= 1:
 # ============================================================
 # CONSULTA RÁPIDA PARA LIMPEZAS
 # ============================================================
-st.write("### 🧹 Consulta Rápida para Equipas de Limpeza")
+st.markdown('<div class="section-title">🧹 Consulta rápida para equipas de limpeza</div>', unsafe_allow_html=True)
 quarto_limpeza = st.selectbox(
     "Selecione o quarto para saber se está livre para limpar:",
     options=opcoes_pesquisa,
@@ -408,7 +456,7 @@ st.write("---")
 col_esquerda, col_direita = st.columns(2, gap="large")
 
 with col_esquerda:
-    st.write("### 🔍 Pesquisa e Entrada (Portaria)")
+    st.markdown('<div class="section-title">🔍 Registo de entradas e saídas</div>', unsafe_allow_html=True)
     escolha = st.selectbox(
         "Pesquise pelo Quarto ou pelo Nome do Aluno para registar:",
         options=opcoes_pesquisa,
@@ -441,7 +489,7 @@ with col_esquerda:
         st.warning("Selecione primeiro um quarto/aluno.")
 
 with col_direita:
-    st.write("### 🕒 Histórico de Movimentos")
+    st.markdown('<div class="section-title">🕒 Histórico de movimentos</div>', unsafe_allow_html=True)
     periodo_atual = periodo_operacional()
     df_atual = carregar_movimentos(periodo_atual)
     if not df_atual.empty:
@@ -457,7 +505,7 @@ with col_direita:
 # RELATÓRIOS E EXPORTAÇÕES
 # ============================================================
 st.write("---")
-st.write("### ⬇️ Exportar Relatórios")
+st.markdown('<div class="section-title">⬇️ Relatórios e exportações</div>', unsafe_allow_html=True)
 
 periodos_df = carregar_movimentos()
 periodos_disponiveis = sorted(
@@ -510,7 +558,7 @@ with col_csv:
 
 # Fechos arquivados
 st.write("---")
-st.write("### 🗂️ Relatórios automáticos arquivados")
+st.markdown('<div class="section-title">🗂️ Relatórios automáticos arquivados</div>', unsafe_allow_html=True)
 st.caption(
     "O fecho é feito quando a aplicação está em execução e é executada depois das 01:00. "
     "Para garantir o fecho mesmo com a aplicação desligada, é necessário agendar uma tarefa "
