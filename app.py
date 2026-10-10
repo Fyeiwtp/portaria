@@ -108,6 +108,11 @@ def inicializar_bd():
                 data_fecho TEXT NOT NULL
             )
         """)
+        conn.execute("""CREATE TABLE IF NOT EXISTS correcoes_estado (
+            movimento_id INTEGER PRIMARY KEY,
+            motivo TEXT NOT NULL,
+            FOREIGN KEY(movimento_id) REFERENCES movimentos(id)
+        )""")
         conn.commit()
 
 
@@ -160,6 +165,23 @@ def adicionar_movimento(quarto, nome, movimento):
         conn.commit()
 
 
+
+def corrigir_estado(quarto, nome, movimento, motivo):
+    """Regista uma correção auditável, sem alterar ou apagar movimentos antigos."""
+    agora = agora_local()
+    with ligar_bd() as conn:
+        cursor = conn.execute(
+            "INSERT INTO movimentos (data_hora, quarto, nome_aluno, movimento, periodo) VALUES (?, ?, ?, ?, ?)",
+            (agora.strftime("%d/%m/%Y %H:%M:%S"), f"Quarto {quarto}", nome,
+             movimento, periodo_operacional(agora)),
+        )
+        conn.execute(
+            "INSERT INTO correcoes_estado (movimento_id, motivo) VALUES (?, ?)",
+            (cursor.lastrowid, motivo.strip()),
+        )
+        conn.commit()
+
+
 def carregar_movimentos(periodo=None):
     with ligar_bd() as conn:
         if periodo:
@@ -169,7 +191,9 @@ def carregar_movimentos(periodo=None):
                        quarto AS 'Quarto',
                        nome_aluno AS 'Nome do Aluno',
                        movimento AS 'Movimento',
-                       periodo AS 'Dia Operacional'
+                       periodo AS 'Dia Operacional',
+                       CASE WHEN EXISTS (SELECT 1 FROM correcoes_estado c WHERE c.movimento_id = movimentos.id)
+                            THEN 'CORREÇÃO MANUAL' ELSE 'REGISTO NORMAL' END AS 'Origem'
                 FROM movimentos
                 WHERE periodo = ?
                 ORDER BY id ASC
@@ -183,7 +207,9 @@ def carregar_movimentos(periodo=None):
                        quarto AS 'Quarto',
                        nome_aluno AS 'Nome do Aluno',
                        movimento AS 'Movimento',
-                       periodo AS 'Dia Operacional'
+                       periodo AS 'Dia Operacional',
+                       CASE WHEN EXISTS (SELECT 1 FROM correcoes_estado c WHERE c.movimento_id = movimentos.id)
+                            THEN 'CORREÇÃO MANUAL' ELSE 'REGISTO NORMAL' END AS 'Origem'
                 FROM movimentos
                 ORDER BY id ASC
                 """
@@ -191,19 +217,33 @@ def carregar_movimentos(periodo=None):
     return pd.DataFrame([dict(r) for r in rows])
 
 
-def ultimo_movimento_quarto(quarto):
+def ultimo_movimento_aluno(quarto, nome):
+    """Último registo deste residente, mesmo em dias operacionais anteriores."""
     with ligar_bd() as conn:
         row = conn.execute(
-            """
-            SELECT movimento, data_hora
-            FROM movimentos
-            WHERE quarto = ?
-            ORDER BY id DESC
-            LIMIT 1
-            """,
-            (f"Quarto {quarto}",),
+            """SELECT movimento, data_hora FROM movimentos
+               WHERE quarto = ? AND nome_aluno = ?
+               ORDER BY id DESC LIMIT 1""",
+            (f"Quarto {quarto}", nome),
         ).fetchone()
     return dict(row) if row else None
+
+
+def alunos_atualmente_fora(alunos):
+    """Um aluno é contado uma vez, se a última movimentação for SAÍDA."""
+    with ligar_bd() as conn:
+        rows = conn.execute("""
+            SELECT m.quarto, m.nome_aluno, m.data_hora, m.movimento
+            FROM movimentos m
+            INNER JOIN (
+                SELECT quarto, nome_aluno, MAX(id) AS ultimo_id
+                FROM movimentos GROUP BY quarto, nome_aluno
+            ) ult ON ult.ultimo_id = m.id
+            WHERE m.movimento = 'SAÍDA'
+        """).fetchall()
+    ativos = {(str(r['Numero']), str(r['Nome'])) for _, r in alunos.iterrows()}
+    return [dict(r) for r in rows
+            if (r['quarto'].removeprefix('Quarto '), r['nome_aluno']) in ativos]
 
 
 # ============================================================
@@ -253,12 +293,13 @@ _df_resumo = carregar_movimentos(periodo_operacional())
 _total_entradas = int((_df_resumo["Movimento"] == "ENTRADA").sum()) if not _df_resumo.empty else 0
 _total_saidas = int((_df_resumo["Movimento"] == "SAÍDA").sum()) if not _df_resumo.empty else 0
 _total_movimentos = len(_df_resumo)
+_fora = alunos_atualmente_fora(alunos_db)
 st.markdown('<div class="section-title">Visão geral de hoje</div>', unsafe_allow_html=True)
 _m1, _m2, _m3, _m4 = st.columns(4)
 _m1.metric("Quartos na lista", len(alunos_db))
 _m2.metric("Movimentos hoje", _total_movimentos)
 _m3.metric("Entradas", _total_entradas)
-_m4.metric("Saídas", _total_saidas)
+_m4.metric("Alunos fora", len(_fora))
 st.write("")
 
 
@@ -318,7 +359,7 @@ def criar_pdf(df, titulo_relatorio, periodo):
         Spacer(1, 7 * mm),
     ]
 
-    colunas = ["Data/Hora", "Quarto", "Nome do Aluno", "Movimento"]
+    colunas = ["Data/Hora", "Quarto", "Nome do Aluno", "Movimento", "Origem"]
     dados = [[Paragraph(c, estilo_cabecalho) for c in colunas]]
 
     if df.empty:
@@ -327,9 +368,10 @@ def criar_pdf(df, titulo_relatorio, periodo):
             Paragraph("-", estilo_celula),
             Paragraph("Sem movimentos registados neste período.", estilo_celula),
             Paragraph("-", estilo_celula),
+            Paragraph("-", estilo_celula),
         ])
     else:
-        df_pdf = df[["Data/Hora", "Quarto", "Nome do Aluno", "Movimento"]].fillna("")
+        df_pdf = df[["Data/Hora", "Quarto", "Nome do Aluno", "Movimento", "Origem"]].fillna("")
         for linha in df_pdf.astype(str).itertuples(index=False, name=None):
             dados.append([
                 Paragraph(html.escape(valor), estilo_celula)
@@ -338,9 +380,10 @@ def criar_pdf(df, titulo_relatorio, periodo):
 
     largura_util = landscape(A4)[0] - 24 * mm
     larguras = [
-        largura_util * 0.20,
+        largura_util * 0.18,
+        largura_util * 0.12,
+        largura_util * 0.35,
         largura_util * 0.15,
-        largura_util * 0.45,
         largura_util * 0.20,
     ]
     tabela = Table(dados, colWidths=larguras, repeatRows=1, hAlign="LEFT")
@@ -420,33 +463,63 @@ if agora.hour >= 1:
         st.warning(f"Não foi possível criar o relatório automático: {exc}")
 
 # ============================================================
-# CONSULTA RÁPIDA PARA LIMPEZAS
+# CONSULTA DE PRESENÇA DOS RESIDENTES
 # ============================================================
-st.markdown('<div class="section-title">🧹 Consulta rápida para equipas de limpeza</div>', unsafe_allow_html=True)
-quarto_limpeza = st.selectbox(
-    "Selecione o quarto para saber se está livre para limpar:",
+st.markdown('<div class="section-title">🏠 Consultar se o aluno está dentro ou fora</div>', unsafe_allow_html=True)
+consulta_aluno = st.selectbox(
+    "Selecione ou pesquise o quarto ou nome do aluno:",
     options=opcoes_pesquisa,
-    key="limpeza_check",
+    key="consulta_presenca",
 )
-
-if quarto_limpeza != placeholder_pesquisa:
-    q_limpo = quarto_limpeza.split(" | ", 1)[0]
-    ultimo = ultimo_movimento_quarto(q_limpo)
-
-    if ultimo:
-        if ultimo["movimento"] == "SAÍDA":
-            st.success(
-                f"🟢 **PODE LIMPAR:** O último movimento do Quarto {q_limpo} "
-                "foi uma SAÍDA."
-            )
-        else:
-            st.error(
-                f"🔴 **NÃO ENTRAR:** O último movimento do Quarto {q_limpo} "
-                "foi uma ENTRADA."
-            )
-        st.caption(f"Último movimento: {ultimo['data_hora']}")
+if consulta_aluno != placeholder_pesquisa:
+    q_consulta = consulta_aluno.split(" | ", 1)[0]
+    nome_consulta = str(alunos_db.loc[alunos_db["Numero"] == q_consulta, "Nome"].iloc[0])
+    ultimo = ultimo_movimento_aluno(q_consulta, nome_consulta)
+    if ultimo is None:
+        st.info(f"⚪ **{nome_consulta} — Quarto {q_consulta}:** sem registos. Estado desconhecido.")
+    elif ultimo["movimento"] == "SAÍDA":
+        st.warning(f"🟠 **{nome_consulta} — Quarto {q_consulta}: FORA da residência**")
+        st.caption(f"Última saída: {ultimo['data_hora']}")
     else:
-        st.info(f"⚪ O Quarto {q_limpo} ainda não tem movimentos registados.")
+        st.success(f"🟢 **{nome_consulta} — Quarto {q_consulta}: DENTRO da residência**")
+        st.caption(f"Última entrada: {ultimo['data_hora']}")
+
+st.markdown('<div class="section-title">🛠️ Corrigir estado do aluno</div>', unsafe_allow_html=True)
+with st.expander("Corrigir presença quando uma entrada ou saída não foi observada"):
+    st.caption("Use apenas depois de confirmar a situação. A correção fica registada no histórico com data, hora e motivo.")
+    with st.form("form_corrigir_estado"):
+        aluno_corrigir = st.selectbox("Aluno ou quarto", opcoes_pesquisa, key="aluno_corrigir")
+        estado_corrigido = st.radio("Estado confirmado", ["FORA", "DENTRO"], horizontal=True)
+        motivo_corrigido = st.text_input("Motivo da correção (obrigatório)", placeholder="Ex.: saída confirmada pelo responsável de turno")
+        confirmar_correcao = st.form_submit_button("Guardar correção", type="primary")
+    if confirmar_correcao:
+        if aluno_corrigir == placeholder_pesquisa:
+            st.error("Escolha um aluno.")
+        elif not motivo_corrigido.strip():
+            st.error("Indique o motivo da correção.")
+        else:
+            q = aluno_corrigir.split(" | ", 1)[0]
+            n = str(alunos_db.loc[alunos_db["Numero"] == q, "Nome"].iloc[0])
+            mov = "SAÍDA" if estado_corrigido == "FORA" else "ENTRADA"
+            anterior = ultimo_movimento_aluno(q, n)
+            if anterior and anterior["movimento"] == mov:
+                st.warning(f"O último registo já indica {estado_corrigido}. Não foi criada uma correção duplicada.")
+            else:
+                corrigir_estado(q, n, mov, motivo_corrigido)
+                st.success("Correção guardada e estado atualizado.")
+                st.rerun()
+
+st.markdown('<div class="section-title">🚶 Alunos atualmente fora da residência</div>', unsafe_allow_html=True)
+if _fora:
+    df_fora = pd.DataFrame([{
+        "Quarto": r["quarto"],
+        "Nome do Aluno": r["nome_aluno"],
+        "Hora da última saída": r["data_hora"],
+    } for r in _fora])
+    st.dataframe(df_fora, use_container_width=True, hide_index=True)
+else:
+    st.info("Não há alunos com uma saída pendente de entrada.")
+st.caption("Estados baseados nos registos e correções introduzidos; podem diferir da presença real. Sem registos, o estado é desconhecido.")
 
 st.write("---")
 
@@ -482,9 +555,13 @@ with col_esquerda:
         if not aluno.empty:
             nome_aluno = str(aluno.iloc[0]["Nome"])
             tipo = "ENTRADA" if entrada else "SAÍDA"
-            adicionar_movimento(quarto_escolhido, nome_aluno, tipo)
-            st.success(f"Registada {tipo} para {nome_aluno}.")
-            st.rerun()
+            ultimo_registo = ultimo_movimento_aluno(quarto_escolhido, nome_aluno)
+            if ultimo_registo and ultimo_registo["movimento"] == tipo:
+                st.warning(f"{nome_aluno} já tem uma {tipo} como último registo. Não foi duplicada.")
+            else:
+                adicionar_movimento(quarto_escolhido, nome_aluno, tipo)
+                st.success(f"Registada {tipo} para {nome_aluno}.")
+                st.rerun()
     elif (entrada or saida) and escolha == placeholder_pesquisa:
         st.warning("Selecione primeiro um quarto/aluno.")
 
@@ -494,7 +571,7 @@ with col_direita:
     df_atual = carregar_movimentos(periodo_atual)
     if not df_atual.empty:
         st.dataframe(
-            df_atual[["Data/Hora", "Quarto", "Nome do Aluno", "Movimento"]].iloc[::-1],
+            df_atual[["Data/Hora", "Quarto", "Nome do Aluno", "Movimento", "Origem"]].iloc[::-1],
             use_container_width=True,
             height=300,
         )
@@ -525,13 +602,14 @@ else:
 
 df_export = carregar_movimentos(periodo_escolhido)
 df_export_tabela = (
-    df_export[["Data/Hora", "Quarto", "Nome do Aluno", "Movimento"]]
+    df_export[["Data/Hora", "Quarto", "Nome do Aluno", "Movimento", "Origem"]]
     if not df_export.empty
     else pd.DataFrame([{
         "Data/Hora": "-",
         "Quarto": "-",
         "Nome do Aluno": "-",
         "Movimento": "-",
+        "Origem": "-",
     }])
 )
 
