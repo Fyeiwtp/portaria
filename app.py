@@ -531,36 +531,74 @@ col_esquerda, col_direita = st.columns(2, gap="large")
 
 with col_esquerda:
     st.markdown('<div class="section-title">🔍 Registo de entradas e saídas</div>', unsafe_allow_html=True)
-    st.caption("Pesquise pelo Quarto ou pelo Nome do Aluno para registar:")
-    # A lista abre numa caixa branca; os botões ficam dentro da mesma caixa,
-    # abaixo da lista, sem tapar o histórico nem exigir outra pesquisa.
-    escolha_atual = st.session_state.get("portaria_reg", placeholder_pesquisa)
-    with st.popover(
-        f"⌄  {escolha_atual}",
-        use_container_width=True,
-    ):
-        escolha = st.selectbox(
-            "Selecionar quarto ou aluno",
-            options=opcoes_pesquisa,
-            key="portaria_reg",
-        )
-        col_btn1, col_btn2 = st.columns(2)
-        with col_btn1:
-            entrada = st.button(
-                "📥 Registar ENTRADA",
-                type="primary",
-                use_container_width=True,
-                key="entrada_menu",
-            )
-        with col_btn2:
-            saida = st.button(
-                "📤 Registar SAÍDA",
-                use_container_width=True,
-                key="saida_menu",
-            )
+    # Pesquisa direta por quarto ou nome, sem menu suspenso a tapar os botões.
+    # Quando há uma correspondência única, o outro campo é preenchido automaticamente.
+    mapa_quartos = {str(r["Numero"]).strip().upper(): str(r["Nome"]) for _, r in alunos_db.iterrows()}
+    mapa_nomes = {str(r["Nome"]).strip(): str(r["Numero"]) for _, r in alunos_db.iterrows()}
 
-    if (entrada or saida) and escolha != placeholder_pesquisa:
-        quarto_escolhido = escolha.split(" | ", 1)[0]
+    if "pesquisa_quarto" not in st.session_state:
+        st.session_state.pesquisa_quarto = ""
+    if "pesquisa_nome" not in st.session_state:
+        st.session_state.pesquisa_nome = ""
+    if "pesquisa_origem" not in st.session_state:
+        st.session_state.pesquisa_origem = "quarto"
+
+    def pesquisar_quarto():
+        st.session_state.pesquisa_origem = "quarto"
+        q = st.session_state.pesquisa_quarto.strip().upper()
+        if q in mapa_quartos:
+            st.session_state.pesquisa_nome = mapa_quartos[q]
+        else:
+            st.session_state.pesquisa_nome = ""
+
+    def pesquisar_nome():
+        st.session_state.pesquisa_origem = "nome"
+        nome_digitado = st.session_state.pesquisa_nome.strip().casefold()
+        correspondencias = [n for n in mapa_nomes if nome_digitado and nome_digitado in n.casefold()]
+        if len(correspondencias) == 1:
+            st.session_state.pesquisa_quarto = mapa_nomes[correspondencias[0]]
+        else:
+            st.session_state.pesquisa_quarto = ""
+
+    st.text_input("🔢 Número do quarto", placeholder="Ex.: 110A", key="pesquisa_quarto", on_change=pesquisar_quarto)
+    st.text_input("👤 Nome do aluno", placeholder="Escreve o nome ou parte dele", key="pesquisa_nome", on_change=pesquisar_nome)
+
+    quarto_texto = st.session_state.pesquisa_quarto.strip().upper()
+    nome_texto = st.session_state.pesquisa_nome.strip()
+    quarto_escolhido = None
+    if st.session_state.pesquisa_origem == "quarto":
+        if quarto_texto in mapa_quartos:
+            quarto_escolhido = quarto_texto
+        elif quarto_texto:
+            st.caption("Quarto não encontrado. Confirma o número.")
+    else:
+        if nome_texto:
+            nomes_encontrados = [n for n in mapa_nomes if nome_texto.casefold() in n.casefold()]
+            if len(nomes_encontrados) == 1:
+                quarto_escolhido = mapa_nomes[nomes_encontrados[0]]
+            elif len(nomes_encontrados) > 1:
+                st.caption("Há vários alunos com esse nome. Escreve mais letras para identificar um só.")
+            else:
+                st.caption("Aluno não encontrado.")
+
+    if quarto_escolhido:
+        st.success(f"**Quarto {quarto_escolhido}** — {mapa_quartos[quarto_escolhido]}")
+
+    col_btn1, col_btn2 = st.columns(2)
+
+    with col_btn1:
+        entrada = st.button(
+            "📥 Registar ENTRADA",
+            type="primary",
+            use_container_width=True,
+        )
+    with col_btn2:
+        saida = st.button(
+            "📤 Registar SAÍDA",
+            use_container_width=True,
+        )
+
+    if (entrada or saida) and quarto_escolhido is not None:
         aluno = alunos_db[alunos_db["Numero"] == quarto_escolhido]
         if not aluno.empty:
             nome_aluno = str(aluno.iloc[0]["Nome"])
@@ -572,8 +610,8 @@ with col_esquerda:
                 adicionar_movimento(quarto_escolhido, nome_aluno, tipo)
                 st.success(f"Registada {tipo} para {nome_aluno}.")
                 st.rerun()
-    elif (entrada or saida) and escolha == placeholder_pesquisa:
-        st.warning("Selecione primeiro um quarto/aluno.")
+    elif (entrada or saida) and quarto_escolhido is None:
+        st.warning("Escreve um quarto ou um nome que identifique um único aluno.")
 
 with col_direita:
     st.markdown('<div class="section-title">🕒 Histórico de movimentos</div>', unsafe_allow_html=True)
