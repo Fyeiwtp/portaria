@@ -39,8 +39,8 @@ if (entrada or saida) and num_introduzido:
     aluno = st.session_state.alunos_db[st.session_state.alunos_db['Numero'] == num_introduzido]
     
     if not aluno.empty:
-        nome_aluno = aluno.iloc['Nome']
-        quarto_aluno = aluno.iloc['Quarto']
+        nome_aluno = aluno.iloc[0]['Nome']
+        quarto_aluno = aluno.iloc[0]['Quarto']
         hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         tipo_movimento = "ENTRADA" if entrada else "SAÍDA"
         
@@ -91,7 +91,7 @@ if st.session_state.livro_registo:
                 Paragraph(f"<b>{r['Movimento']}</b>", estilo_texto)
             ])
         
-       tabela = Table(dados_tabela, colWidths=[110, 40, 180, 80, 80])
+        tabela = Table(dados_tabela, colWidths=[120, 40, 180, 100, 80])
         tabela.setStyle(TableStyle([
             ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1E3A8A')),
             ('ALIGN', (0,0), (-1,-1), 'LEFT'),
