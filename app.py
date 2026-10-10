@@ -574,7 +574,7 @@ with col_direita:
         st.dataframe(
             df_atual[["Data/Hora", "Quarto", "Nome do Aluno", "Movimento", "Origem"]].iloc[::-1],
             use_container_width=True,
-            height=650,
+            height=400,
         )
     else:
         st.info("Nenhum movimento registado no período operacional atual.")
