@@ -8,8 +8,12 @@ CAMPOS = {
     "Check-in": ["Nome", "Chave", "Entrada", "Quarto", "Hora"],
     "Check-out": ["Nome", "Chave", "Saída", "Quarto", "Hora"],
     "Visitantes": [
-        "Nome", "Identificação", "Visitado",
-        "Quarto", "Entrada", "Saída",
+        "Nome",
+        "Identificação",
+        "Visitado",
+        "Quarto",
+        "Entrada",
+        "Saída",
     ],
 }
 
@@ -21,14 +25,31 @@ def criar_ficha_pdf(tipo, valores=None, vigilante="", data=""):
     largura, altura = A4
 
     c.setTitle("Portaria - " + tipo)
+
     c.setFillColor(colors.HexColor("#12213a"))
-    c.rect(0, altura - 108, largura, 108, fill=1, stroke=0)
+    c.rect(
+        0,
+        altura - 108,
+        largura,
+        108,
+        fill=1,
+        stroke=0,
+    )
 
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", 22)
-    c.drawString(40, altura - 55, "PORTARIA RESIDENCIAL")
+    c.drawString(
+        40,
+        altura - 55,
+        "PORTARIA RESIDENCIAL",
+    )
+
     c.setFont("Helvetica", 14)
-    c.drawString(40, altura - 82, "Ficha de " + tipo)
+    c.drawString(
+        40,
+        altura - 82,
+        "Ficha de " + tipo,
+    )
 
     c.setFillColor(colors.HexColor("#12213a"))
     c.setFont("Helvetica", 10)
@@ -63,9 +84,15 @@ def criar_ficha_pdf(tipo, valores=None, vigilante="", data=""):
         else:
             c.setStrokeColor(colors.HexColor("#cbd5e1"))
             c.roundRect(
-                40, y - 31, largura - 80, 34,
-                4, stroke=1, fill=0,
+                40,
+                y - 31,
+                largura - 80,
+                34,
+                4,
+                stroke=1,
+                fill=0,
             )
+
             c.setFont("Helvetica", 10)
             linhas = simpleSplit(
                 str(valores.get(campo, "")),
@@ -73,21 +100,38 @@ def criar_ficha_pdf(tipo, valores=None, vigilante="", data=""):
                 10,
                 largura - 100,
             )
+
             for j, linha in enumerate(linhas[:2]):
-                c.drawString(50, y - 10 - j * 12, linha)
+                c.drawString(
+                    50,
+                    y - 10 - j * 12,
+                    linha,
+                )
 
         y -= 78
 
+    c.setFillColor(colors.HexColor("#12213a"))
     c.setFont("Helvetica", 10)
-    c.drawString(40, 100, "Vigilante: " + vigilante)
     c.drawString(
-        40, 70,
-        "Assinatura: __________________________________________",
+        40,
+        100,
+        "Vigilante: " + vigilante,
     )
+
+    # A assinatura aparece apenas no check-in e check-out.
+    if tipo != "Visitantes":
+        c.drawString(
+            40,
+            70,
+            "Assinatura: __________________________________________",
+        )
+
     c.setFont("Helvetica", 8)
     c.drawString(
-        40, 35,
+        40,
+        35,
         "Ficha de portaria | Guarde uma cópia após o preenchimento.",
     )
+
     c.save()
     return buffer.getvalue()
