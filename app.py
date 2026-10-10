@@ -18,6 +18,7 @@ from reportlab.platypus import (
     Paragraph,
     Spacer,
     Table,
+    LongTable,
     TableStyle,
 )
 
@@ -387,7 +388,10 @@ def criar_pdf(df, titulo_relatorio, periodo, intervalo_calendario=False):
         largura_util * 0.15,
         largura_util * 0.20,
     ]
-    tabela = Table(dados, colWidths=larguras, repeatRows=1, hAlign="LEFT")
+    tabela = LongTable(
+        dados, colWidths=larguras, repeatRows=1, hAlign="LEFT",
+        splitByRow=1, longTableOptimize=1,
+    )
     comandos = [
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E3A8A")),
         ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#D1D5DB")),
@@ -402,7 +406,32 @@ def criar_pdf(df, titulo_relatorio, periodo, intervalo_calendario=False):
         comandos.append(("BACKGROUND", (0, i), (-1, i), colors.HexColor(cor)))
     tabela.setStyle(TableStyle(comandos))
     elementos.append(tabela)
-    doc.build(elementos)
+
+    # Uma página vertical contínua: a altura acompanha a quantidade de registos.
+    # O PDF padrão limita o tamanho da página; para relatórios excecionalmente
+    # extensos, conserva-se a paginação para não perder qualquer movimento.
+    largura_pagina = landscape(A4)[0]
+    _, altura_tabela = tabela.wrap(largura_util, 1000000)
+    altura_cabecalho = 125  # título, datas, emissão e espaçamento
+    altura_necessaria = altura_tabela + altura_cabecalho + 24 * mm
+    limite_pagina = 14000  # pontos; compatível com leitores PDF habituais
+    if altura_necessaria <= limite_pagina:
+        doc.pagesize = (largura_pagina, max(landscape(A4)[1], altura_necessaria))
+        doc._calc()
+    else:
+        doc.pagesize = landscape(A4)
+        doc._calc()
+
+    def numerar_paginas(canvas, documento):
+        canvas.saveState()
+        canvas.setFont("Helvetica", 8)
+        canvas.setFillColor(colors.HexColor("#64748B"))
+        canvas.drawRightString(documento.pagesize[0] - 12 * mm, 7 * mm,
+                               f"Página {documento.page}")
+        canvas.restoreState()
+
+    doc.build(elementos, onFirstPage=numerar_paginas,
+              onLaterPages=numerar_paginas)
 
     resultado = buffer.getvalue()
     buffer.close()
