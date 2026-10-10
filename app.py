@@ -1628,3 +1628,85 @@ st.sidebar.info(
     "Os registos são guardados no ficheiro portaria_registos.sqlite3. "
     "Faça cópias de segurança desse ficheiro regularmente."
 )
+
+st.write("---")
+
+with st.expander("🗑️ Apagar registos antigos de visitantes"):
+    with ligar_bd() as conn:
+        visitas_terminadas = conn.execute("""
+            SELECT id, dados, criado_em
+            FROM fichas_portaria
+            WHERE tipo = 'Visitantes'
+              AND saida_em IS NOT NULL
+            ORDER BY id DESC
+        """).fetchall()
+
+    if not visitas_terminadas:
+        st.info("Não existem visitas terminadas para apagar.")
+    else:
+        mapa_visitas = {
+            registo["id"]: registo
+            for registo in visitas_terminadas
+        }
+
+        def rotulo_visita_apagar(numero):
+            registo = mapa_visitas[numero]
+            dados = json.loads(registo["dados"])
+
+            return (
+                f"#{numero} | {dados.get('Nome', '')} | "
+                f"Quarto {dados.get('Quarto', '')} | "
+                f"{registo['criado_em']}"
+            )
+
+        st.warning(
+            "Ao apagar, o registo e o PDF guardado no site "
+            "são eliminados definitivamente. "
+            "Descarregue o PDF antes, se precisar de uma cópia."
+        )
+
+        with st.form("form_apagar_visitantes"):
+            selecionados = st.multiselect(
+                "Escolha os registos que quer apagar",
+                options=list(mapa_visitas),
+                format_func=rotulo_visita_apagar,
+            )
+
+            confirmar = st.checkbox(
+                "Confirmo que quero apagar os registos selecionados."
+            )
+
+            apagar = st.form_submit_button(
+                "🗑️ Apagar selecionados",
+                type="primary",
+            )
+
+        if apagar:
+            if not selecionados:
+                st.error("Selecione pelo menos um registo.")
+            elif not confirmar:
+                st.error("Marque a confirmação antes de apagar.")
+            else:
+                with ligar_bd() as conn:
+                    conn.executemany("""
+                        DELETE FROM fichas_portaria
+                        WHERE id = ?
+                          AND tipo = 'Visitantes'
+                          AND saida_em IS NOT NULL
+                    """, [(numero,) for numero in selecionados])
+
+                recente = st.session_state.get("ficha_download")
+
+                if recente:
+                    numero_recente = recente["token"].split("_", 1)[0]
+                    if numero_recente in {
+                        str(numero) for numero in selecionados
+                    }:
+                        st.session_state.pop("ficha_download", None)
+                        st.session_state.pop("download_tentado", None)
+
+                st.session_state["visitantes_apagados"] = True
+                st.rerun()
+
+    if st.session_state.pop("visitantes_apagados", False):
+        st.success("Registos de visitantes apagados.")
