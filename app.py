@@ -7,6 +7,7 @@ import sqlite3
 from zoneinfo import ZoneInfo
 import html
 import time
+import hmac
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
@@ -35,6 +36,55 @@ FUSO_HORARIO = ZoneInfo("Atlantic/Azores")
 BASE_DADOS = Path(__file__).with_name("portaria_registos.sqlite3")
 PASTA_RELATORIOS = Path(__file__).with_name("relatorios")
 PASTA_RELATORIOS.mkdir(parents=True, exist_ok=True)
+
+# ============================================================
+# ACESSO DOS FUNCIONÁRIOS
+# ============================================================
+FUNCIONARIOS = {
+    "tiago": "Tiago Penacho",
+    "pedro": "Pedro Medeiros",
+    "daniel": "Daniel Picado",
+    "joao": "João Botelho",
+}
+
+# Definir em Streamlit Cloud > App settings > Secrets:
+# PORTARIA_PASSWORD = "123"
+try:
+    SENHA_PORTARIA = str(st.secrets.get("PORTARIA_PASSWORD", ""))
+except Exception:
+    SENHA_PORTARIA = ""
+
+if not SENHA_PORTARIA:
+    st.error("Falta configurar PORTARIA_PASSWORD nas Secrets do Streamlit Cloud.")
+    st.stop()
+
+if "funcionario_autenticado" not in st.session_state:
+    st.session_state["funcionario_autenticado"] = None
+
+if st.session_state["funcionario_autenticado"] not in FUNCIONARIOS:
+    st.title("🔒 Acesso à Portaria Residencial")
+    st.caption("Acesso reservado aos funcionários da portaria")
+    with st.form("login_portaria"):
+        utilizador = st.selectbox(
+            "Funcionário", list(FUNCIONARIOS),
+            format_func=lambda u: FUNCIONARIOS[u],
+        )
+        senha = st.text_input("Palavra-passe", type="password")
+        entrar = st.form_submit_button("Entrar", type="primary")
+    if entrar:
+        if hmac.compare_digest(senha, SENHA_PORTARIA):
+            st.session_state["funcionario_autenticado"] = utilizador
+            st.rerun()
+        else:
+            st.error("Palavra-passe incorreta.")
+    st.stop()
+
+FUNCIONARIO_ATUAL = FUNCIONARIOS[st.session_state["funcionario_autenticado"]]
+with st.sidebar:
+    st.success(f"👤 {FUNCIONARIO_ATUAL}")
+    if st.button("🚪 Terminar sessão", use_container_width=True):
+        st.session_state.clear()
+        st.rerun()
 
 # ============================================================
 # DESIGN / INTERFACE
@@ -114,6 +164,10 @@ def inicializar_bd():
             motivo TEXT NOT NULL,
             FOREIGN KEY(movimento_id) REFERENCES movimentos(id)
         )""")
+        # Atualização compatível com bases de dados existentes.
+        colunas = {r[1] for r in conn.execute("PRAGMA table_info(movimentos)").fetchall()}
+        if "funcionario" not in colunas:
+            conn.execute("ALTER TABLE movimentos ADD COLUMN funcionario TEXT")
         conn.commit()
 
 
@@ -158,10 +212,10 @@ def adicionar_movimento(quarto, nome, movimento):
         conn.execute(
             """
             INSERT INTO movimentos
-            (data_hora, quarto, nome_aluno, movimento, periodo)
-            VALUES (?, ?, ?, ?, ?)
+            (data_hora, quarto, nome_aluno, movimento, periodo, funcionario)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (momento_texto, f"Quarto {quarto}", nome, movimento, periodo),
+            (momento_texto, f"Quarto {quarto}", nome, movimento, periodo, FUNCIONARIO_ATUAL),
         )
         conn.commit()
 
@@ -172,9 +226,9 @@ def corrigir_estado(quarto, nome, movimento, motivo):
     agora = agora_local()
     with ligar_bd() as conn:
         cursor = conn.execute(
-            "INSERT INTO movimentos (data_hora, quarto, nome_aluno, movimento, periodo) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO movimentos (data_hora, quarto, nome_aluno, movimento, periodo, funcionario) VALUES (?, ?, ?, ?, ?, ?)",
             (agora.strftime("%d/%m/%Y %H:%M:%S"), f"Quarto {quarto}", nome,
-             movimento, periodo_operacional(agora)),
+             movimento, periodo_operacional(agora), FUNCIONARIO_ATUAL),
         )
         conn.execute(
             "INSERT INTO correcoes_estado (movimento_id, motivo) VALUES (?, ?)",
@@ -193,6 +247,7 @@ def carregar_movimentos(periodo=None):
                        nome_aluno AS 'Nome do Aluno',
                        movimento AS 'Movimento',
                        periodo AS 'Dia Operacional',
+                        COALESCE(funcionario, 'Registo anterior') AS 'Funcionário',
                        CASE WHEN EXISTS (SELECT 1 FROM correcoes_estado c WHERE c.movimento_id = movimentos.id)
                             THEN 'CORREÇÃO MANUAL' ELSE 'REGISTO NORMAL' END AS 'Origem'
                 FROM movimentos
@@ -209,6 +264,7 @@ def carregar_movimentos(periodo=None):
                        nome_aluno AS 'Nome do Aluno',
                        movimento AS 'Movimento',
                        periodo AS 'Dia Operacional',
+                        COALESCE(funcionario, 'Registo anterior') AS 'Funcionário',
                        CASE WHEN EXISTS (SELECT 1 FROM correcoes_estado c WHERE c.movimento_id = movimentos.id)
                             THEN 'CORREÇÃO MANUAL' ELSE 'REGISTO NORMAL' END AS 'Origem'
                 FROM movimentos
@@ -688,7 +744,7 @@ with col_direita:
     df_atual = carregar_movimentos(periodo_atual)
     if not df_atual.empty:
         st.dataframe(
-            df_atual[["Data/Hora", "Quarto", "Nome do Aluno", "Movimento", "Origem"]].iloc[::-1],
+            df_atual[["Data/Hora", "Quarto", "Nome do Aluno", "Movimento", "Origem", "Funcionário"]].iloc[::-1],
             use_container_width=True,
             height=400,
         )
@@ -733,7 +789,7 @@ else:
     st.info(f"📋 {len(df_export)} movimento(s) encontrado(s) de {rotulo}.")
     if not df_export.empty:
         with st.expander("👁️ Ver movimentos deste período"):
-            st.dataframe(df_export, use_container_width=True, hide_index=True)
+            st.dataframe(df_todos.loc[df_export.index, ["Data/Hora", "Quarto", "Nome do Aluno", "Movimento", "Origem", "Funcionário"]] if not df_todos.empty else df_export, use_container_width=True, hide_index=True)
 
     pdf_bytes = criar_pdf(df_export, "RELATÓRIO DE PORTARIA E VIGILÂNCIA", rotulo, intervalo_calendario=True)
     csv_bytes = df_export.to_csv(index=False).encode("utf-8-sig")
