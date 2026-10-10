@@ -83,7 +83,7 @@ if 'alunos_db' not in st.session_state:
         {"Numero": "219A", "Nome": "Leandro Medeiros Amaral", "Quarto": "Quarto 219A"},
         {"Numero": "219B", "Nome": "Rafael Cabral da Silva", "Quarto": "Quarto 219B"},
         {"Numero": "220A", "Nome": "Margarida Pereira", "Quarto": "Quarto 220A"},
-        {"Numero": "220B", "Theme": "Carlota Oliveira Baptista Reis", "Quarto": "Quarto 220B"},
+        {"Numero": "220B", "Nome": "Carlota Oliveira Baptista Reis", "Quarto": "Quarto 220B"},
         {"Numero": "221A", "Nome": "Daniela Alexandra Marques Carreira", "Quarto": "Quarto 221A"},
         {"Numero": "221B", "Nome": "Matilde Bairos Fumo", "Quarto": "Quarto 221B"},
         {"Numero": "222A", "Nome": "Maria Elvira Basílio Canada", "Quarto": "Quarto 222A"},
@@ -99,7 +99,7 @@ if 'alunos_db' not in st.session_state:
         {"Numero": "227A", "Nome": "Gabrielle Cristina da Silva", "Quarto": "Quarto 227A"},
         {"Numero": "227B", "Nome": "Joana Isabel Pereira Reis Rato", "Quarto": "Quarto 227B"},
         {"Numero": "228A", "Nome": "Luana Filipa da Silva Cabral", "Quarto": "Quarto 228A"},
-        {"Numero": "228B", "Nome": "Jéssica Inês Alves Teixeira", "Quarto": "Quarto 228B"},
+        {"Numero": "228B", "Jéssica Inês Alves Teixeira": "Jéssica Inês Alves Teixeira", "Quarto": "Quarto 228B"},
         {"Numero": "229A", "Nome": "Maria Inês Figueiredo Bentes", "Quarto": "Quarto 229A"},
         {"Numero": "229B", "Nome": "Mariana Alves Barrinha", "Quarto": "Quarto 229B"},
         {"Numero": "230A", "Nome": "Helena Isabel Ramos da Costa", "Quarto": "Quarto 230A"},
@@ -123,8 +123,9 @@ with col2:
 if (entrada or saida) and num_introduzido:
     aluno = st.session_state.alunos_db[st.session_state.alunos_db['Numero'].str.lower() == num_introduzido.lower()]
     if not aluno.empty:
-        nome_aluno = aluno.iloc['Nome']
-        quarto_aluno = aluno.iloc['Quarto']
+        # CORREÇÃO DA EXTRAÇÃO DO TEXTO (Usando indexação correta do Pandas)
+        nome_aluno = aluno.iloc[0]['Nome']
+        quarto_aluno = aluno.iloc[0]['Quarto']
         hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         tipo_movimento = "ENTRADA" if entrada else "SAÍDA"
         st.session_state.livro_registo.append({"Data/Hora": hora_atual, "Quarto": quarto_aluno, "Nome do Aluno": nome_aluno, "Movimento": tipo_movimento})
@@ -133,6 +134,3 @@ if (entrada or saida) and num_introduzido:
         st.error(f"⚠️ O quarto '{num_introduzido}' não foi encontrado na base de dados.")
 
 st.write("---")
-st.write("### 📋 Livro de Registo Diário (Atualizado em Tempo Real)")
-
-# A tabela agora fica sempre fixa sem condições de "else" invisíveis
