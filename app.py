@@ -82,7 +82,7 @@ if 'alunos_db' not in st.session_state:
         {"Numero": "218B", "Nome": "Leonor José Abreu Sousa"},
         {"Numero": "219A", "Nome": "Leandro Medeiros Amaral"},
         {"Numero": "219B", "Nome": "Rafael Cabral da Silva"},
-        {"Numero": "220A", "Nome": "Margarida Pereira"},
+        {"Numero": "Margarida Pereira", "Nome": "Margarida Pereira"},
         {"Numero": "220B", "Nome": "Carlota Oliveira Baptista Reis"},
         {"Numero": "221A", "Nome": "Daniela Alexandra Marques Carreira"},
         {"Numero": "221B", "Nome": "Matilde Bairos Fumo"},
