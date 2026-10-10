@@ -12,7 +12,7 @@ from reportlab.lib import colors
 st.set_page_config(page_title="Portaria e Quartos", page_icon="📝", layout="wide")
 
 st.title("📝 Registo Automatizado de Vigilância")
-st.subheader("Controlo Residencial com Exportação em PDF")
+st.subheader("Controlo Residencial com Estado de Limpezas e PDF")
 st.write("---")
 
 # BASE DE DADOS COMPACTADA OFICIAL
@@ -55,19 +55,38 @@ if 'alunos_db' not in st.session_state:
 if 'livro_registo' not in st.session_state:
     st.session_state.livro_registo = []
 
-# Criar opções dinâmicas para a lista de pesquisa: "Quarto 110A - Nome" ou "Nome - Quarto 110A"
+# Opções para a caixa de pesquisa
 opcoes_pesquisa = ["-- Clique para digitar Quarto ou Nome --"]
 for _, row in st.session_state.alunos_db.iterrows():
     opcoes_pesquisa.append(f"{row['Numero']} | {row['Nome']}")
 
-# Criar a estrutura em duas colunas fixas
+# --- SECÇÃO DE CONSULTA PARA AS LIMPEZAS ---
+st.write("### 🧹 Consulta Rápida para Equipas de Limpeza")
+quarto_limpeza = st.selectbox("Selecione o quarto para saber se está livre para limpar:", options=opcoes_pesquisa, key="limpeza_check")
+
+if quarto_limpeza != "-- Clique para digitar Quarto ou Nome --":
+    q_limpo = quarto_limpeza.split(" | ")
+    
+    # Procurar no histórico o último movimento deste quarto
+    historico_quarto = [r for r in st.session_state.livro_registo if r["Quarto"] == f"Quarto {q_limpo}"]
+    
+    if historico_quarto:
+        ultimo_movimento = historico_quarto[-1]["Movimento"]
+        if ultimo_movimento == "SAÍDA":
+            st.success(f"🟢 **PODE LIMPAR:** O aluno do Quarto {q_limpo} encontra-se **FORA DO QUARTO** (Saída registada às {historico_quarto[-1]['Data/Hora']}).")
+        else:
+            st.error(f"🔴 **NÃO ENTRAR:** O aluno do Quarto {q_limpo} encontra-se atualmente **DENTRO DO QUARTO**.")
+    else:
+        st.info(f"⚪ O Quarto {q_limpo} ainda não registou movimentos hoje. Confirme na portaria antes de entrar.")
+
+st.write("---")
+
+# --- SECÇÃO DE REGISTO DE ENTRADAS E SAÍDAS ---
 col_esquerda, col_direita = st.columns(2, gap="large")
 
 with col_esquerda:
-    st.write("### 🔍 Pesquisa e Entrada")
-    
-    # Esta caixa abre uma lista interativa onde pode pesquisar diretamente por texto
-    escolha = st.selectbox("Pesquise pelo Quarto ou pelo Nome do Aluno:", options=opcoes_pesquisa)
+    st.write("### 🔍 Pesquisa e Entrada (Portaria)")
+    escolha = st.selectbox("Pesquise pelo Quarto ou pelo Nome do Aluno para registar:", options=opcoes_pesquisa, key="portaria_reg")
     
     col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
@@ -76,13 +95,11 @@ with col_esquerda:
         saida = st.button("📤 Registar SAÍDA", use_container_width=True)
 
     if (entrada or saida) and escolha != "-- Clique para digitar Quarto ou Nome --":
-        # Extrair o número do quarto a partir da escolha selecionada
-        quarto_escolhido = escolha.split(" | ")[0]
-        
+        quarto_escolhido = escolha.split(" | ")
         aluno = st.session_state.alunos_db[st.session_state.alunos_db['Numero'] == quarto_escolhido]
         
         if not aluno.empty:
-            aluno_fixo = aluno.iloc[0]
+            aluno_fixo = aluno.iloc
             nome_aluno = aluno_fixo['Nome']
             num_quarto = aluno_fixo['Numero']
             
@@ -100,14 +117,17 @@ with col_esquerda:
                 st.success(f"✅ Registada ENTRADA para {nome_aluno} ({num_quarto})")
             else:
                 st.warning(f"🚪 Registada SAÍDA para {nome_aluno} ({num_quarto})")
+            
+            # Recarrega a página para atualizar instantaneamente o painel de limpezas no topo
+            st.rerun()
 
 with col_direita:
     st.write("### 🕒 Histórico do Turno (Lado Direito)")
     if st.session_state.livro_registo:
         df_visualizacao = pd.DataFrame(st.session_state.livro_registo)
-        st.dataframe(df_visualizacao.iloc[::-1], use_container_width=True, height=250)
+        st.dataframe(df_visualizacao.iloc[::-1], use_container_width=True, height=220)
     else:
-        st.info("Nenhum movimento registado. O histórico aparecerá aqui à direita.")
+        st.info("Nenhum movimento registado. O histórico aparecerá aqui.")
 
 st.write("---")
 st.write("### ⬇️ Exportar Relatório de Final de Dia")
@@ -136,7 +156,7 @@ def gerar_pdf(dados):
             Paragraph(f"<b>{r.get('Movimento', '-')}</b>", estilo_texto)
         ])
     
-    tabela = Table(dados_tab, colWidths=[120, 80, 220, 80])
+    tabela = Table(dados_tab, colWidths=)
     tabela.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1E3A8A')),
         ('ALIGN', (0,0), (-1,-1), 'LEFT'),
@@ -153,7 +173,3 @@ def gerar_pdf(dados):
 col_btn_pdf, col_btn_excel = st.columns(2)
 with col_btn_pdf:
     pdf_bytes = gerar_pdf(st.session_state.livro_registo)
-    st.download_button(label="📄 Descarregar Relatório em PDF", data=pdf_bytes, file_name="relatorio_turno.pdf", mime="application/pdf", use_container_width=True)
-with col_btn_excel:
-    df_excel = pd.DataFrame(st.session_state.livro_registo if st.session_state.livro_registo else [{"Data/Hora": "-", "Quarto": "-", "Nome do Aluno": "-", "Movimento": "-"}])
-    st.download_button(label="📊 Descarregar Folha Excel (CSV)", data=df_excel.to_csv(index=False).encode('utf-8'), file_name="relatorio_turno.csv", mime="text/csv", use_container_width=True)
