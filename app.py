@@ -9,13 +9,13 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
-# Configuração da página em modo Largo para caber o histórico à direita
-st.set_page_config(page_title="Registo de Portaria e Quartos", page_icon="📝", layout="wide")
+st.set_page_config(page_title="Registo de Portaria e Quartos", page_icon="📝", layout="centered")
 
 st.title("📝 Registo Automatizado de Vigilância")
+st.subheader("Controlo de Quartos com Exportação em PDF")
 st.write("---")
 
-# LISTA OFICIAL DE ALUNOS E QUARTOS
+# LISTA OFICIAL DE ALUNOS E QUARTOS CARREGADA
 if 'alunos_db' not in st.session_state:
     st.session_state.alunos_db = pd.DataFrame([
         {"Numero": "1.9A", "Nome": "Safira Coelho Curado", "Quarto": "Quarto 1.9A"},
@@ -94,7 +94,7 @@ if 'alunos_db' not in st.session_state:
         {"Numero": "224B", "Nome": "Carolina Alexandra Pereira Fernandes", "Quarto": "Quarto 224B"},
         {"Numero": "225A", "Nome": "Érica Brites Freitas", "Quarto": "Quarto 225A"},
         {"Numero": "225B", "Nome": "Maria Amália Poças", "Quarto": "Quarto 225B"},
-        {"Numero": "226A", "Nome": "Jacinta Borges", "Quarto": "Quarto 226A"},
+        {"Happy": "226A", "Nome": "Jacinta Borges", "Quarto": "Quarto 226A"},
         {"Numero": "226B", "Nome": "Carlota Abreu Freitas", "Quarto": "Quarto 226B"},
         {"Numero": "227A", "Nome": "Gabrielle Cristina da Silva", "Quarto": "Quarto 227A"},
         {"Numero": "227B", "Nome": "Joana Isabel Pereira Reis Rato", "Quarto": "Quarto 227B"},
@@ -111,32 +111,33 @@ if 'alunos_db' not in st.session_state:
 if 'livro_registo' not in st.session_state:
     st.session_state.livro_registo = []
 
-# Criação das duas colunas: Esquerda para controlo, Direita para o histórico visual
-col_esquerda, col_direita = st.columns([1, 1], gap="large")
+st.write("### 🔍 Registo por Número de Quarto")
+num_introduzido = st.text_input("Introduza o Número do Quarto (Ex: 110A, 215B):", placeholder="Ex: 110A", key="num_aluno").strip()
 
-with col_esquerda:
-    st.write("### 🔑 Scanner e Registo")
-    num_introduzido = st.text_input("Introduza o Número do Quarto (Ex: 110A, 215B):", placeholder="Ex: 110A", key="num_aluno").strip()
+col1, col2 = st.columns(2)
+with col1:
+    entrada = st.button("📥 Registar ENTRADA", type="primary", use_container_width=True)
+with col2:
+    saida = st.button("📤 Registar SAÍDA", use_container_width=True)
 
-    btn_col1, btn_col2 = st.columns(2)
-    with btn_col1:
-        entrada = st.button("📥 Registar ENTRADA", type="primary", use_container_width=True)
-    with btn_col2:
-        saida = st.button("📤 Registar SAÍDA", use_container_width=True)
-
-    if (entrada or saida) and num_introduzido:
-        aluno = st.session_state.alunos_db[st.session_state.alunos_db['Numero'].str.lower() == num_introduzido.lower()]
+if (entrada or saida) and num_introduzido:
+    aluno = st.session_state.alunos_db[st.session_state.alunos_db['Numero'].str.lower() == num_introduzido.lower()]
+    
+    if not aluno.empty:
+        nome_aluno = aluno.iloc['Nome']
+        quarto_aluno = aluno.iloc['Quarto']
+        hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        tipo_movimento = "ENTRADA" if entrada else "SAÍDA"
         
-        if not aluno.empty:
-            nome_aluno = aluno.iloc[0]['Nome']
-            quarto_aluno = aluno.iloc[0]['Quarto']
-            hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-            tipo_movimento = "ENTRADA" if entrada else "SAÍDA"
-            
-            st.session_state.livro_registo.append({
-                "Data/Hora": hora_atual,
-                "Quarto": quarto_aluno,
-                "Nome do Aluno": nome_aluno,
-                "Movimento": tipo_movimento
-            })
-            
+        st.session_state.livro_registo.append({
+            "Data/Hora": hora_atual,
+            "Quarto": quarto_aluno,
+            "Nome do Aluno": nome_aluno,
+            "Movimento": tipo_movimento
+        })
+        
+        if entrada:
+            st.success(f"✅ Registada ENTRADA: {nome_aluno} ({quarto_aluno}) às {hora_atual.split()}")
+        else:
+            st.warning(f"🚪 Registada SAÍDA: {nome_aluno} ({quarto_aluno}) às {hora_atual.split()}")
+    else:
