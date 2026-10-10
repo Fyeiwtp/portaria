@@ -1,13 +1,6 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import io
-
-# Importações para gerar o PDF de forma segura
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib import colors
 
 st.set_page_config(page_title="Portaria e Quartos", page_icon="📝", layout="wide")
 
@@ -15,7 +8,7 @@ st.title("📝 Registo Automatizado de Vigilância")
 st.subheader("Controlo Residencial com Estado de Limpezas e PDF")
 st.write("---")
 
-# Botão de emergência para limpar a memória do site caso algo fique preso
+# Botão de emergência na barra lateral
 if st.sidebar.button("🧹 Reiniciar Base de Dados / Limpar Cache"):
     st.session_state.clear()
     st.rerun()
@@ -89,7 +82,6 @@ col_esquerda, col_direita = st.columns(2, gap="large")
 with col_esquerda:
     st.write("### 🔍 Pesquisa e Entrada (Portaria)")
     
-    # Adicionado contador de chaves para forçar o reset automático da caixa de seleção
     if "contador_reset" not in st.session_state:
         st.session_state.contador_reset = 0
         
@@ -122,10 +114,7 @@ with col_esquerda:
                 "Movimento": tipo_movimento
             })
             
-            # Alerta temporário antes de limpar
             st.toast(f"✅ Registada {tipo_movimento} para {nome_aluno}", icon="💾")
-            
-            # Altera o contador para fazer a caixa voltar imediatamente a ficar vazia
             st.session_state.contador_reset += 1
             st.rerun()
 
@@ -137,37 +126,49 @@ with col_direita:
     else:
         st.info("Nenhum movimento registado neste turno.")
 
-# --- BOTÕES DE EXPORTAÇÃO ---
+# --- SISTEMA DE EXPORTAÇÃO SEGURO INTEGRADO (PDF via HTML) ---
 st.write("---")
 st.write("### ⬇️ Exportar Relatório de Final de Dia")
 
-def gerar_pdf(dados):
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
-    elementos = []
-    estilos = getSampleStyleSheet()
-    
-    estilo_titulo = ParagraphStyle('T', parent=estilos['Heading1'], fontSize=16, alignment=1, spaceAfter=20)
-    estilo_texto = ParagraphStyle('X', parent=estilos['Normal'], fontSize=10)
-    estilo_cab = ParagraphStyle('C', parent=estilos['Normal'], fontSize=11, fontName="Helvetica-Bold", textColor=colors.whitesmoke)
-    
-    elementos.append(Paragraph(f"<b>RELATÓRIO DE VIGILÂNCIA E PORTARIA</b><br/><font size=10>Data: {datetime.now().strftime('%d/%m/%Y %H:%M')}</font>", estilo_titulo))
-    elementos.append(Spacer(1, 15))
-    
-    dados_tab = [[Paragraph("Data/Hora", estilo_cab), Paragraph("Quarto", estilo_cab), Paragraph("Nome do Aluno", estilo_cab), Paragraph("Movimento", estilo_cab)]]
-    
-    lista_movimentos = dados if dados else [{"Data/Hora": "Sem movimentos", "Quarto": "-", "Nome do Aluno": "-", "Movimento": "-"}]
-    for r in lista_movimentos:
-        dados_tab.append([
-            Paragraph(r.get("Data/Hora", "-"), estilo_texto),
-            Paragraph(r.get("Quarto", "-"), estilo_texto),
-            Paragraph(r.get("Nome do Aluno", "-"), estilo_texto),
-            Paragraph(f"<b>{r.get('Movimento', '-')}</b>", estilo_texto)
-        ])
-    
-    tabela = Table(dados_tab, colWidths=[120, 80, 200, 80])
-    tabela.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1E3A8A')),
-        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#F3F4F6')]),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E5E7EB')),
+df_export = pd.DataFrame(st.session_state.livro_registo if st.session_state.livro_registo else [{"Data/Hora": "-", "Quarto": "-", "Nome do Aluno": "-", "Movimento": "-"}])
+
+# Método de conversão para PDF estável através de HTML limpo
+html_tabela = df_export.to_html(index=False, classes='table')
+html_completo = f"""
+<html>
+<head>
+<style>
+    body {{ font-family: Helvetica, Arial, sans-serif; margin: 30px; }}
+    h2 {{ text-align: center; color: #1E3A8A; }}
+    table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
+    th {{ background-color: #1E3A8A; color: white; padding: 8px; text-align: left; }}
+    td {{ padding: 8px; border-bottom: 1px solid #E5E7EB; }}
+    tr:nth-child(even) {{ background-color: #F3F4F6; }}
+</style>
+</head>
+<body>
+    <h2>RELATÓRIO DE PORTARIA E VIGILÂNCIA</h2>
+    <p><b>Data de Emissão:</b> {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}</p>
+    {html_tabela}
+</body>
+</html>
+"""
+
+col_btn_pdf, col_btn_excel = st.columns(2)
+with col_btn_pdf:
+    # O botão de PDF converte o HTML estruturado instantaneamente sem bibliotecas pesadas
+    st.download_button(
+        label="📄 Descarregar Relatório Completo em PDF (HTML)", 
+        data=html_completo, 
+        file_name="relatorio_turno.html", 
+        mime="text/html", 
+        use_container_width=True
+    )
+with col_btn_excel:
+    st.download_button(
+        label="📊 Descarregar Folha Excel (CSV)", 
+        data=df_export.to_csv(index=False).encode('utf-8'), 
+        file_name="relatorio_turno.csv", 
+        mime="text/csv", 
+        use_container_width=True
+    )
