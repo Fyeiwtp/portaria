@@ -12,7 +12,7 @@ from reportlab.lib import colors
 st.set_page_config(page_title="Registo de Portaria e Quartos", page_icon="📝", layout="centered")
 
 st.title("📝 Registo Automatizado de Vigilância")
-st.subheader("Controlo de Quartos com Exportação em PDF")
+st.subheader("Controlo de Quartos com Pesquisa Instantânea e PDF")
 st.write("---")
 
 # LISTA OFICIAL DE ALUNOS E QUARTOS
@@ -101,41 +101,42 @@ if 'alunos_db' not in st.session_state:
         {"Numero": "228A", "Nome": "Luana Filipa da Silva Cabral", "Quarto": "Quarto 228A"},
         {"Numero": "228B", "Nome": "Jéssica Inês Alves Teixeira", "Quarto": "Quarto 228B"},
         {"Numero": "229A", "Nome": "Maria Inês Figueiredo Bentes", "Quarto": "Quarto 229A"},
-        {"Numero": "229B", "Nome": "Mariana Alves Barrinha", "Quarto": "Quarto 229B"},
         {"Numero": "230A", "Nome": "Helena Isabel Ramos da Costa", "Quarto": "Quarto 230A"},
         {"Numero": "231A", "Nome": "Pedro Guilherme Baptista Silva", "Quarto": "Quarto 231A"},
-        {"Numero": "231B", "Workspace": "Duarte Carreno Novais", "Quarto": "Quarto 231B"}
+        {"Numero": "231B", "Nome": "Duarte Carreno Novais", "Quarto": "Quarto 231B"},
     ])
 
 if 'livro_registo' not in st.session_state:
     st.session_state.livro_registo = []
 
-st.write("### 🔍 Registo por Número de Quarto")
-num_introduzido = st.text_input("Introduza o Número do Quarto (Ex: 110A, 215B):", placeholder="Ex: 110A", key="num_aluno").strip()
+# Criar opções legíveis para a pesquisa: "Quarto X - Nome do Aluno"
+opcoes_alunos = ["-- Selecione ou digite o número do quarto --"] + [
+    f"Quarto {row['Numero']} - {row['Nome']}" for _, row in st.session_state.alunos_db.iterrows()
+]
 
-col1, col2 = st.columns(2)
-with col1:
-    entrada = st.button("📥 Registar ENTRADA", type="primary", use_container_width=True)
-with col2:
-    saida = st.button("📤 Registar SAÍDA", use_container_width=True)
+st.write("### 🔍 Pesquisa Instantânea de Aluno")
+escolha = st.selectbox("Comece a digitar o número do quarto para pesquisar:", options=opcoes_alunos)
 
-if (entrada or saida) and num_introduzido:
-    aluno = st.session_state.alunos_db[st.session_state.alunos_db['Numero'].str.lower() == num_introduzido.lower()]
-    if not aluno.empty:
-        nome_aluno = aluno.iloc[0]['Nome']
-        quarto_aluno = aluno.iloc[0]['Quarto']
+# Processa apenas se o vigilante tiver escolhido um aluno válido
+if escolha != "-- Selecione ou digite o número do quarto --":
+    # Extrair o número do quarto a partir do texto selecionado
+    quarto_selecionado = escolha.split(" - ")[0].replace("Quarto ", "")
+    aluno_selecionado = st.session_state.alunos_db[st.session_state.alunos_db['Numero'] == quarto_selecionado].iloc[0]
+    
+    nome_aluno = aluno_selecionado['Nome']
+    quarto_aluno = aluno_selecionado['Quarto']
+    
+    # Mostrar feedback visual instantâneo do aluno selecionado
+    st.info(f"👤 **Aluno Selecionado:** {nome_aluno} | 🛏️ **{quarto_aluno}**")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        entrada = st.button("📥 Registar ENTRADA", type="primary", use_container_width=True)
+    with col2:
+        saida = st.button("📤 Registar SAÍDA", use_container_width=True)
+        
+    if entrada or saida:
         hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         tipo_movimento = "ENTRADA" if entrada else "SAÍDA"
-        st.session_state.livro_registo.append({"Data/Hora": hora_atual, "Quarto": quarto_aluno, "Nome do Aluno": nome_aluno, "Movimento": tipo_movimento})
-        st.success(f"✅ Movimento guardado para {nome_aluno} ({quarto_aluno})")
-    else:
-        st.error(f"⚠️ O quarto '{num_introduzido}' não foi encontrado.")
-
-st.write("---")
-st.write("### 📋 Livro de Registo Diário (Tempo Real)")
-
-if len(st.session_state.livro_registo) > 0:
-    df_registo = pd.DataFrame(st.session_state.livro_registo)
-    st.dataframe(df_registo.iloc[::-1], use_container_width=True)
-    
-    st.write("---")
+        
+        st.session_state.livro_registo.append({
