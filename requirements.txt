@@ -1,2 +1,4 @@
-reportlab
-pandas
+streamlit>=1.40,<2
+pandas>=2,<3
+reportlab>=4,<5
+tzdata
