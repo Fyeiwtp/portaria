@@ -5,7 +5,7 @@ from datetime import datetime
 st.set_page_config(page_title="Portaria e Quartos", page_icon="📝", layout="wide")
 
 st.title("📝 Registo Automatizado de Vigilância")
-st.subheader("Controlo Residencial com Estado de Limpezas")
+st.subheader("Controlo Residencial Completo")
 st.write("---")
 
 # Botão de emergência na barra lateral para limpar a cache
@@ -52,34 +52,17 @@ if 'alunos_db' not in st.session_state:
 if 'livro_registo' not in st.session_state:
     st.session_state.livro_registo = []
 
+# Criar lista para a pesquisa interativa
 opcoes_pesquisa = ["-- Clique para digitar Quarto ou Nome --"]
 for _, row in st.session_state.alunos_db.iterrows():
     opcoes_pesquisa.append(f"{row['Numero']} | {row['Nome']}")
-
-# --- SECÇÃO DE CONSULTA RÁPIDA DE LIMPEZAS ---
-st.write("### 🧹 Consulta Rápida para Equipas de Limpeza")
-quarto_limpeza = st.selectbox("Selecione o quarto para saber se está livre para limpar:", options=opcoes_pesquisa, key="limpeza_check")
-
-if quarto_limpeza != "-- Clique para digitar Quarto ou Nome --":
-    q_limpo = quarto_limpeza.split(" | ")
-    historico_quarto = [r for r in st.session_state.livro_registo if r["Quarto"] == f"Quarto {q_limpo}"]
-    
-    if historico_quarto:
-        ultimo_movimento = historico_quarto[-1]["Movimento"]
-        if ultimo_movimento == "SAÍDA":
-            st.success(f"🟢 **PODE LIMPAR:** O aluno do Quarto {q_limpo} encontra-se **FORA DO QUARTO**.")
-        else:
-            st.error(f"🔴 **NÃO ENTRAR:** O aluno do Quarto {q_limpo} encontra-se atualmente **DENTRO DO QUARTO**.")
-    else:
-        st.info(f"⚪ O Quarto {q_limpo} ainda não registou movimentos hoje.")
-
-st.write("---")
 
 # --- SECÇÃO DE REGISTO EM DUAS COLUNAS FIXAS ---
 col_esquerda, col_direita = st.columns(2, gap="large")
 
 with col_esquerda:
     st.write("### 🔍 Pesquisa e Entrada (Portaria)")
+    
     if "contador_reset" not in st.session_state:
         st.session_state.contador_reset = 0
         
@@ -96,25 +79,23 @@ with col_esquerda:
         saida = st.button("📤 Registar SAÍDA", use_container_width=True)
 
     if (entrada or saida) and escolha != "-- Clique para digitar Quarto ou Nome --":
-        quarto_escolhido = escolha.split(" | ")
-        aluno = st.session_state.alunos_db[st.session_state.alunos_db['Numero'] == quarto_escolhido]
+        partes = escolha.split(" | ")
+        quarto_escolhido = partes[0]
+        nome_escolhido = partes[1]
         
-        if not aluno.empty:
-            nome_aluno = aluno.iloc['Nome']
-            num_quarto = aluno.iloc['Numero']
-            hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-            tipo_movimento = "ENTRADA" if entrada else "SAÍDA"
-            
-            st.session_state.livro_registo.append({
-                "Data/Hora": hora_atual,
-                "Quarto": f"Quarto {num_quarto}",
-                "Nome do Aluno": nome_aluno,
-                "Movimento": tipo_movimento
-            })
-            
-            st.toast(f"✅ Registada {tipo_movimento} para {nome_aluno}", icon="💾")
-            st.session_state.contador_reset += 1
-            st.rerun()
+        hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        tipo_movimento = "ENTRADA" if entrada else "SAÍDA"
+        
+        st.session_state.livro_registo.append({
+            "Data/Hora": hora_atual,
+            "Quarto": f"Quarto {quarto_escolhido}",
+            "Nome do Aluno": nome_escolhido,
+            "Movimento": tipo_movimento
+        })
+        
+        st.toast(f"✅ Registada {tipo_movimento} para {nome_escolhido}", icon="💾")
+        st.session_state.contador_reset += 1
+        st.rerun()
 
 with col_direita:
     st.write("### 🕒 Histórico do Turno (Lado Direito)")
@@ -124,31 +105,17 @@ with col_direita:
     else:
         st.info("Nenhum movimento registado neste turno.")
 
-# --- BOTÕES DE EXPORTAÇÃO DIRETOS (100% Livres de módulos externos) ---
+# --- BOTÃO DE EXPORTAÇÃO SEGURO E DIRETO ---
 st.write("---")
-st.write("### ⬇️ Exportar Relatório de Final de Dia")
+st.write("### ⬇ nighttime Exportar Relatório de Final de Dia")
 
 df_export = pd.DataFrame(st.session_state.livro_registo if st.session_state.livro_registo else [{"Data/Hora": "-", "Quarto": "-", "Nome do Aluno": "-", "Movimento": "-"}])
-
 csv_dados = df_export.to_csv(index=False).encode('utf-8')
-texto_dados = df_export.to_string(index=False)
 
-col_exp1, col_exp2 = st.columns(2)
-
-with col_exp1:
-    st.download_button(
-        label="📊 Descarregar Relatório Completo para Excel (CSV)",
-        data=csv_dados,
-        file_name=f"relatorio_portaria_{datetime.now().strftime('%Y%m%d')}.csv",
-        mime="text/csv",
-        use_container_width=True
-    )
-
-with col_exp2:
-    st.download_button(
-        label="📄 Descarregar Livro de Ponto em Texto (.txt)",
-        data=texto_dados,
-        file_name=f"relatorio_portaria_{datetime.now().strftime('%Y%m%d')}.txt",
-        mime="text/plain",
-        use_container_width=True
-    )
+st.download_button(
+    label="📊 Descarregar Relatório Completo para Excel / Impressão", 
+    data=csv_dados, 
+    file_name=f"relatorio_portaria_{datetime.now().strftime('%Y%m%d')}.csv", 
+    mime="text/csv", 
+    use_container_width=True
+)
