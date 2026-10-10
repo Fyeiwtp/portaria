@@ -617,7 +617,9 @@ with col_esquerda:
                 st.warning(f"{nome_aluno} já tem uma {tipo} como último registo. Não foi duplicada.")
             else:
                 adicionar_movimento(quarto_escolhido, nome_aluno, tipo)
-                st.success(f"Registada {tipo} para {nome_aluno}.")
+                # Limpa os dois campos depois de guardar o movimento.
+                st.session_state["registo_pesquisa_quarto"] = vazio_quarto
+                st.session_state["registo_pesquisa_nome"] = vazio_nome
                 st.rerun()
     elif (entrada or saida) and quarto_escolhido is None:
         st.warning("Seleciona um aluno ou escreve um quarto válido.")
