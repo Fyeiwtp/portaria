@@ -15,7 +15,7 @@ st.title("📝 Registo Automatizado de Vigilância")
 st.subheader("Controlo de Quartos com Exportação em PDF")
 st.write("---")
 
-# LISTA OFICIAL DE ALUNOS E QUARTOS CARREGADA
+# LISTA OFICIAL DE ALUNOS E QUARTOS
 if 'alunos_db' not in st.session_state:
     st.session_state.alunos_db = pd.DataFrame([
         {"Numero": "1.9A", "Nome": "Safira Coelho Curado", "Quarto": "Quarto 1.9A"},
@@ -94,7 +94,7 @@ if 'alunos_db' not in st.session_state:
         {"Numero": "224B", "Nome": "Carolina Alexandra Pereira Fernandes", "Quarto": "Quarto 224B"},
         {"Numero": "225A", "Nome": "Érica Brites Freitas", "Quarto": "Quarto 225A"},
         {"Numero": "225B", "Nome": "Maria Amália Poças", "Quarto": "Quarto 225B"},
-        {"Happy": "226A", "Nome": "Jacinta Borges", "Quarto": "Quarto 226A"},
+        {"Numero": "226A", "Nome": "Jacinta Borges", "Quarto": "Quarto 226A"},
         {"Numero": "226B", "Nome": "Carlota Abreu Freitas", "Quarto": "Quarto 226B"},
         {"Numero": "227A", "Nome": "Gabrielle Cristina da Silva", "Quarto": "Quarto 227A"},
         {"Numero": "227B", "Nome": "Joana Isabel Pereira Reis Rato", "Quarto": "Quarto 227B"},
@@ -103,9 +103,8 @@ if 'alunos_db' not in st.session_state:
         {"Numero": "229A", "Nome": "Maria Inês Figueiredo Bentes", "Quarto": "Quarto 229A"},
         {"Numero": "229B", "Nome": "Mariana Alves Barrinha", "Quarto": "Quarto 229B"},
         {"Numero": "230A", "Nome": "Helena Isabel Ramos da Costa", "Quarto": "Quarto 230A"},
-        {"Numero": "230B", "Nome": "Joana Margarida Paim Gregório", "Quarto": "Quarto 230B"},
         {"Numero": "231A", "Nome": "Pedro Guilherme Baptista Silva", "Quarto": "Quarto 231A"},
-        {"Numero": "231B", "Nome": "Duarte Carreno Novais", "Quarto": "Quarto 231B"},
+        {"Numero": "231B", "Workspace": "Duarte Carreno Novais", "Quarto": "Quarto 231B"}
     ])
 
 if 'livro_registo' not in st.session_state:
@@ -122,22 +121,21 @@ with col2:
 
 if (entrada or saida) and num_introduzido:
     aluno = st.session_state.alunos_db[st.session_state.alunos_db['Numero'].str.lower() == num_introduzido.lower()]
-    
     if not aluno.empty:
-        nome_aluno = aluno.iloc['Nome']
-        quarto_aluno = aluno.iloc['Quarto']
+        nome_aluno = aluno.iloc[0]['Nome']
+        quarto_aluno = aluno.iloc[0]['Quarto']
         hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         tipo_movimento = "ENTRADA" if entrada else "SAÍDA"
-        
-        st.session_state.livro_registo.append({
-            "Data/Hora": hora_atual,
-            "Quarto": quarto_aluno,
-            "Nome do Aluno": nome_aluno,
-            "Movimento": tipo_movimento
-        })
-        
-        if entrada:
-            st.success(f"✅ Registada ENTRADA: {nome_aluno} ({quarto_aluno}) às {hora_atual.split()}")
-        else:
-            st.warning(f"🚪 Registada SAÍDA: {nome_aluno} ({quarto_aluno}) às {hora_atual.split()}")
+        st.session_state.livro_registo.append({"Data/Hora": hora_atual, "Quarto": quarto_aluno, "Nome do Aluno": nome_aluno, "Movimento": tipo_movimento})
+        st.success(f"✅ Movimento guardado para {nome_aluno} ({quarto_aluno})")
     else:
+        st.error(f"⚠️ O quarto '{num_introduzido}' não foi encontrado.")
+
+st.write("---")
+st.write("### 📋 Livro de Registo Diário (Tempo Real)")
+
+if len(st.session_state.livro_registo) > 0:
+    df_registo = pd.DataFrame(st.session_state.livro_registo)
+    st.dataframe(df_registo.iloc[::-1], use_container_width=True)
+    
+    st.write("---")
