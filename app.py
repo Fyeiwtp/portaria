@@ -417,7 +417,7 @@ def criar_pdf(df, titulo_relatorio, periodo, intervalo_calendario=False):
         Spacer(1, 7 * mm),
     ]
 
-    colunas = ["Data/Hora", "Quarto", "Nome do Aluno", "Movimento", "Origem"]
+    colunas = ["Data/Hora", "Quarto", "Nome do Aluno", "Movimento", "Origem", "Vigilante"]
     dados = [[Paragraph(c, estilo_cabecalho) for c in colunas]]
 
     if df.empty:
@@ -427,9 +427,10 @@ def criar_pdf(df, titulo_relatorio, periodo, intervalo_calendario=False):
             Paragraph("Sem movimentos registados neste período.", estilo_celula),
             Paragraph("-", estilo_celula),
             Paragraph("-", estilo_celula),
+            Paragraph("-", estilo_celula),
         ])
     else:
-        df_pdf = df[["Data/Hora", "Quarto", "Nome do Aluno", "Movimento", "Origem"]].fillna("")
+        df_pdf = df[colunas].fillna("")
         for linha in df_pdf.astype(str).itertuples(index=False, name=None):
             dados.append([
                 Paragraph(html.escape(valor), estilo_celula)
@@ -438,11 +439,12 @@ def criar_pdf(df, titulo_relatorio, periodo, intervalo_calendario=False):
 
     largura_util = landscape(A4)[0] - 24 * mm
     larguras = [
-        largura_util * 0.18,
+        largura_util * 0.16,
+        largura_util * 0.10,
+        largura_util * 0.29,
         largura_util * 0.12,
-        largura_util * 0.35,
         largura_util * 0.15,
-        largura_util * 0.20,
+        largura_util * 0.18,
     ]
     tabela = LongTable(
         dados, colWidths=larguras, repeatRows=1, hAlign="LEFT",
@@ -772,7 +774,7 @@ if data_inicio > data_fim:
 else:
     df_todos = carregar_movimentos()
     if df_todos.empty:
-        df_export = pd.DataFrame(columns=["Data/Hora", "Quarto", "Nome do Aluno", "Movimento", "Origem"])
+        df_export = pd.DataFrame(columns=["Data/Hora", "Quarto", "Nome do Aluno", "Movimento", "Origem", "Vigilante"])
     else:
         # A base de dados conserva a data como DD/MM/AAAA HH:MM:SS, por vezes com fuso no fim.
         # Converter apenas os 19 primeiros caracteres permite consultar registos antigos e novos.
@@ -781,7 +783,7 @@ else:
             format="%d/%m/%Y %H:%M:%S", errors="coerce"
         )
         filtro = (datas_movimentos.dt.date >= data_inicio) & (datas_movimentos.dt.date <= data_fim)
-        df_export = df_todos.loc[filtro, ["Data/Hora", "Quarto", "Nome do Aluno", "Movimento", "Origem"]].copy()
+        df_export = df_todos.loc[filtro, ["Data/Hora", "Quarto", "Nome do Aluno", "Movimento", "Origem", "Vigilante"]].copy()
         df_export["_ordem"] = datas_movimentos.loc[filtro]
         df_export = df_export.sort_values("_ordem", kind="stable").drop(columns="_ordem")
 
@@ -789,7 +791,7 @@ else:
     st.info(f"📋 {len(df_export)} movimento(s) encontrado(s) de {rotulo}.")
     if not df_export.empty:
         with st.expander("👁️ Ver movimentos deste período"):
-            st.dataframe(df_todos.loc[df_export.index, ["Data/Hora", "Quarto", "Nome do Aluno", "Movimento", "Origem", "Vigilante"]] if not df_todos.empty else df_export, use_container_width=True, hide_index=True)
+            st.dataframe(df_export, use_container_width=True, hide_index=True)
 
     pdf_bytes = criar_pdf(df_export, "RELATÓRIO DE PORTARIA E VIGILÂNCIA", rotulo, intervalo_calendario=True)
     csv_bytes = df_export.to_csv(index=False).encode("utf-8-sig")
