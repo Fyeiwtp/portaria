@@ -531,11 +531,31 @@ col_esquerda, col_direita = st.columns(2, gap="large")
 
 with col_esquerda:
     st.markdown('<div class="section-title">🔍 Registo de entradas e saídas</div>', unsafe_allow_html=True)
-    escolha = st.selectbox(
-        "Pesquise pelo Quarto ou pelo Nome do Aluno para registar:",
-        options=opcoes_pesquisa,
-        key="portaria_reg",
-    )
+    termo_pesquisa = st.text_input(
+        "Pesquisar aluno ou quarto:",
+        placeholder="Escreve o nome ou número do quarto...",
+        key="pesquisa_registo_texto",
+    ).strip()
+    escolha = placeholder_pesquisa
+    if termo_pesquisa:
+        correspondencias = [
+            opcao for opcao in opcoes_pesquisa[1:]
+            if termo_pesquisa.casefold() in opcao.casefold()
+        ]
+        if correspondencias:
+            # Resultados limitados para manter os botões sempre à vista.
+            opcoes_visiveis = correspondencias[:6]
+            escolha = st.radio(
+                "Seleciona o aluno:",
+                options=opcoes_visiveis,
+                key="portaria_reg_resultado",
+            )
+            if len(correspondencias) > 6:
+                st.caption(f"A mostrar 6 de {len(correspondencias)} resultados. Escreve mais letras para filtrar.")
+        else:
+            st.info("Não foi encontrado nenhum aluno ou quarto.")
+    else:
+        st.caption("Escreve para procurar. Os botões ficam visíveis abaixo dos resultados.")
     col_btn1, col_btn2 = st.columns(2)
 
     with col_btn1:
