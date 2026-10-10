@@ -14,20 +14,104 @@ st.set_page_config(page_title="Registo de Portaria e Quartos", page_icon="📝",
 st.title("📝 Registo Automatizado de Vigilância")
 st.subheader("Controlo de Quartos com Exportação em PDF")
 
-# Base de dados simulada de Alunos e Quartos
+# LISTA OFICIAL DE ALUNOS E QUARTOS CARREGADA COMPLETA
 if 'alunos_db' not in st.session_state:
     st.session_state.alunos_db = pd.DataFrame([
-        {"Numero": "101", "Nome": "Carlos Sousa", "Quarto": "Quarto 12"},
-        {"Numero": "102", "Nome": "Sofia Martins", "Quarto": "Quarto 15"},
-        {"Numero": "103", "Nome": "Ricardo Silva", "Quarto": "Quarto 22"},
-        {"Numero": "104", "Nome": "Mariana Costa", "Quarto": "Quarto 08"},
+        {"Numero": "1.9A", "Nome": "Safira Coelho Curado", "Quarto": "Quarto 1.9A"},
+        {"Numero": "1.9B", "Nome": "Yolanta Yermakova", "Quarto": "Quarto 1.9B"},
+        {"Numero": "110A", "Nome": "Iara Victoria Amorim Senra", "Quarto": "Quarto 110A"},
+        {"Numero": "110B", "Nome": "Bárbara da Rocha Soares", "Quarto": "Quarto 110B"},
+        {"Numero": "111A", "Nome": "Abel Cabral Costa", "Quarto": "Quarto 111A"},
+        {"Numero": "111B", "Nome": "Paulo Henrique Pacheco de Sousa Duarte", "Quarto": "Quarto 111B"},
+        {"Numero": "112A", "Nome": "Sizikelly Soares da Gama", "Quarto": "Quarto 112A"},
+        {"Numero": "112B", "Nome": "Beatriz Mendonça da Silva", "Quarto": "Quarto 112B"},
+        {"Numero": "113A", "Nome": "Afonso Luís Medeiros Freitas", "Quarto": "Quarto 113A"},
+        {"Numero": "113B", "Nome": "Carolina Nunes Correia", "Quarto": "Quarto 113B"},
+        {"Numero": "114A", "Nome": "Joana Natal Pinto de Magalhães", "Quarto": "Quarto 114A"},
+        {"Numero": "114B", "Nome": "Luana Vitória Rodrigues Rachão Lopes", "Quarto": "Quarto 114B"},
+        {"Numero": "115A", "Nome": "Júlia Beatriz Rodrigues de Freitas Pereira", "Quarto": "Quarto 115A"},
+        {"Numero": "115B", "Nome": "Inês Sofia Untea Machado", "Quarto": "Quarto 115B"},
+        {"Numero": "116A", "Nome": "Henrique Barbosa Pereira", "Quarto": "Quarto 116A"},
+        {"Numero": "116B", "Nome": "Ricardo Barbosa Pereira", "Quarto": "Quarto 116B"},
+        {"Numero": "117A", "Nome": "José Carlos Oliveira da Silva Rocha", "Quarto": "Quarto 117A"},
+        {"Numero": "117B", "Nome": "Pedro Calvinho", "Quarto": "Quarto 117B"},
+        {"Numero": "118A", "Nome": "Alícia Dias Marcos", "Quarto": "Quarto 118A"},
+        {"Numero": "118B", "Nome": "Ema Alves da Silva Neves de Barros", "Quarto": "Quarto 118B"},
+        {"Numero": "119A", "Nome": "Bruno Nunes Pereira", "Quarto": "Quarto 119A"},
+        {"Numero": "119B", "Nome": "Luís Gabriel Lemos da Silva", "Quarto": "Quarto 119B"},
+        {"Numero": "120A", "Nome": "Lanna Lajarin de Oliveira Costa", "Quarto": "Quarto 120A"},
+        {"Numero": "120B", "Nome": "Maria Miguel Dias Mandim Lino", "Quarto": "Quarto 120B"},
+        {"Numero": "121A", "Nome": "Ana Margarida Silva Ferreira", "Quarto": "Quarto 121A"},
+        {"Numero": "121B", "Nome": "Núria Silva Teixeira", "Quarto": "Quarto 121B"},
+        {"Numero": "122A", "Nome": "Rodrigo Sousa Mendonça", "Quarto": "Quarto 122A"},
+        {"Numero": "122B", "Nome": "Duarte Nuno Dias Marques", "Quarto": "Quarto 122B"},
+        {"Numero": "123A", "Nome": "Rodrigo Miguel Pacheco Talaia", "Quarto": "Quarto 123A"},
+        {"Numero": "123B", "Nome": "André Brito Palma", "Quarto": "Quarto 123B"},
+        {"Numero": "124A", "Nome": "Bruno Jorge Câmara Silva", "Quarto": "Quarto 124A"},
+        {"Numero": "124B", "Nome": "Tiago Belchior Soares de Albergaria", "Quarto": "Quarto 124B"},
+        {"Numero": "125A", "Nome": "Paulo Jorge Medeiros Alexandre", "Quarto": "Quarto 125A"},
+        {"Numero": "125B", "Nome": "Mateus Oliveira", "Quarto": "Quarto 125B"},
+        {"Numero": "126A", "Nome": "Pedro Soares Casado", "Quarto": "Quarto 126A"},
+        {"Numero": "126B", "Nome": "Dinis Manuel Martins Santos", "Quarto": "Quarto 126B"},
+        {"Numero": "127A", "Nome": "Inês Luzia Leal Fagundes", "Quarto": "Quarto 127A"},
+        {"Numero": "127B", "Nome": "Ana Luísa Leite Matos", "Quarto": "Quarto 127B"},
+        {"Numero": "128A", "Nome": "Vitória Skrzypietz", "Quarto": "Quarto 128A"},
+        {"Numero": "128B", "Nome": "Suzana Sousa Dos Santos", "Quarto": "Quarto 128B"},
+        {"Numero": "129A", "Nome": "Mafalda Ferreira Martins", "Quarto": "Quarto 129A"},
+        {"Numero": "129B", "Nome": "Carolina Relva Mendonça", "Quarto": "Quarto 129B"},
+        {"Numero": "130A", "Nome": "Dinis Karpov", "Quarto": "Quarto 130A"},
+        {"Numero": "130B", "Nome": "João António Silveira Ramalho", "Quarto": "Quarto 130B"},
+        {"Numero": "210A", "Nome": "Alice Francisca Ladeiras Caldeira", "Quarto": "Quarto 210A"},
+        {"Numero": "210B", "Nome": "Camila Afonso Brás Matos Pereira", "Quarto": "Quarto 210B"},
+        {"Numero": "211A", "Nome": "Tomás Miranda", "Quarto": "Quarto 211A"},
+        {"Numero": "211B", "Nome": "Luis Carlos Rego Pacheco", "Quarto": "Quarto 211B"},
+        {"Numero": "212A", "Nome": "Mafalda Machado Cabral", "Quarto": "Quarto 212A"},
+        {"Numero": "212B", "Nome": "Soraia Filipa Andrade", "Quarto": "Quarto 212B"},
+        {"Numero": "213A", "Nome": "Gabriela Nogueira Ferreira", "Quarto": "Quarto 213A"},
+        {"Numero": "213B", "Nome": "Mariana Gonçalves", "Quarto": "Quarto 213B"},
+        {"Numero": "214A", "Nome": "Bianca Antonio", "Quarto": "Quarto 214A"},
+        {"Numero": "214B", "Nome": "Sara Sofia Vieira Cró", "Quarto": "Quarto 214B"},
+        {"Numero": "215A", "Nome": "Jorge Miguel Pacheco Botelho", "Quarto": "Quarto 215A"},
+        {"Numero": "215B", "Nome": "Jahyr Isney Morales Correia", "Quarto": "Quarto 215B"},
+        {"Numero": "216A", "Nome": "Anastasia Belilovets", "Quarto": "Quarto 216A"},
+        {"Numero": "216B", "Nome": "Gabriela Filipa Rodrigues Santos", "Quarto": "Quarto 216B"},
+        {"Numero": "217A", "Nome": "Rodrigo Freitas Spínola", "Quarto": "Quarto 217A"},
+        {"Numero": "217B", "Nome": "Guilherme Bento da Cruz Marques", "Quarto": "Quarto 217B"},
+        {"Numero": "218A", "Nome": "Anastácia Dikovych", "Quarto": "Quarto 218A"},
+        {"Numero": "218B", "Nome": "Leonor José Abreu Sousa", "Quarto": "Quarto 218B"},
+        {"Numero": "219A", "Nome": "Leandro Medeiros Amaral", "Quarto": "Quarto 219A"},
+        {"Numero": "219B", "Nome": "Rafael Cabral da Silva", "Quarto": "Quarto 219B"},
+        {"Numero": "220A", "Nome": "Margarida Pereira", "Quarto": "Quarto 220A"},
+        {"Numero": "220B", "Nome": "Carlota Oliveira Baptista Reis", "Quarto": "Quarto 220B"},
+        {"Numero": "221A", "Nome": "Daniela Alexandra Marques Carreira", "Quarto": "Quarto 221A"},
+        {"Numero": "221B", "Nome": "Matilde Bairos Fumo", "Quarto": "Quarto 221B"},
+        {"Numero": "222A", "Nome": "Maria Elvira Basílio Canada", "Quarto": "Quarto 222A"},
+        {"Numero": "222B", "Nome": "João Gonçalo Nascimento Abreu", "Quarto": "Quarto 222B"},
+        {"Numero": "223A", "Nome": "Bruno Miguel Pereira Medeiros", "Quarto": "Quarto 223A"},
+        {"Numero": "223B", "Nome": "Raquel Viveiros Sousa", "Quarto": "Quarto 223B"},
+        {"Numero": "224A", "Nome": "Ana Cristina Marques da Silva", "Quarto": "Quarto 224A"},
+        {"Numero": "224B", "Nome": "Carolina Alexandra Pereira Fernandes", "Quarto": "Quarto 224B"},
+        {"Numero": "225A", "Nome": "Érica Brites Freitas", "Quarto": "Quarto 225A"},
+        {"Numero": "225B", "Nome": "Maria Amália Poças", "Quarto": "Quarto 225B"},
+        {"Numero": "226A", "Nome": "Jacinta Borges", "Quarto": "Quarto 226A"},
+        {"Numero": "226B", "Nome": "Carlota Abreu Freitas", "Quarto": "Quarto 226B"},
+        {"Numero": "227A", "Nome": "Gabrielle Cristina da Silva", "Quarto": "Quarto 227A"},
+        {"Numero": "227B", "Nome": "Joana Isabel Pereira Reis Rato", "Quarto": "Quarto 227B"},
+        {"Numero": "228A", "Nome": "Luana Filipa da Silva Cabral", "Quarto": "Quarto 228A"},
+        {"Numero": "228B", "Nome": "Jéssica Inês Alves Teixeira", "Quarto": "Quarto 228B"},
+        {"Numero": "229A", "Nome": "Maria Inês Figueiredo Bentes", "Quarto": "Quarto 229A"},
+        {"Numero": "229B", "Nome": "Mariana Alves Barrinha", "Quarto": "Quarto 229B"},
+        {"Numero": "230A", "Nome": "Helena Isabel Ramos da Costa", "Quarto": "Quarto 230A"},
+        {"Numero": "230B", "Nome": "Joana Margarida Paim Gregório", "Quarto": "Quarto 230B"},
+        {"Numero": "231A", "Nome": "Pedro Guilherme Baptista Silva", "Quarto": "Quarto 231A"},
+        {"Numero": "231B", "Nome": "Duarte Carreno Novais", "Quarto": "Quarto 231B"},
     ])
 
 if 'livro_registo' not in st.session_state:
     st.session_state.livro_registo = []
 
-st.write("### 🔍 Scanner / Introdução de Dados")
-num_introduzido = st.text_input("Introduza o Número do Aluno:", placeholder="Ex: 101", key="num_aluno")
+st.write("### 🔍 Registo por Número de Quarto")
+num_introduzido = st.text_input("Introduza o Número do Quarto (Ex: 110A, 215B):", placeholder="Ex: 110A", key="num_aluno").strip()
 
 col1, col2 = st.columns(2)
 with col1:
@@ -36,7 +120,7 @@ with col2:
     saida = st.button("📤 Registar SAÍDA", use_container_width=True)
 
 if (entrada or saida) and num_introduzido:
-    aluno = st.session_state.alunos_db[st.session_state.alunos_db['Numero'] == num_introduzido]
+    aluno = st.session_state.alunos_db[st.session_state.alunos_db['Numero'].str.lower() == num_introduzido.lower()]
     
     if not aluno.empty:
         nome_aluno = aluno.iloc[0]['Nome']
@@ -46,73 +130,13 @@ if (entrada or saida) and num_introduzido:
         
         st.session_state.livro_registo.append({
             "Data/Hora": hora_atual,
-            "Número": num_introduzido,
-            "Nome": nome_aluno,
             "Quarto": quarto_aluno,
+            "Nome do Aluno": nome_aluno,
             "Movimento": tipo_movimento
         })
         
         if entrada:
-            st.success(f"✅ Registada ENTRADA de {nome_aluno} ({quarto_aluno})")
+            st.success(f"✅ Registada ENTRADA: {nome_aluno} ({quarto_aluno})")
         else:
-            st.warning(f"🚪 Registada SAÍDA de {nome_aluno} ({quarto_aluno})")
+            st.warning(f"🚪 Registada SAÍDA: {nome_aluno} ({quarto_aluno})")
     else:
-        st.error(f"⚠️ O número {num_introduzido} não foi encontrado.")
-
-st.write("---")
-st.write("### 📋 Livro de Registo Diário")
-
-if st.session_state.livro_registo:
-    df_registo = pd.DataFrame(st.session_state.livro_registo)
-    st.dataframe(df_registo.iloc[::-1], use_container_width=True)
-    
-    def gerar_pdf(dados):
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30, title="Relatorio_Vigilancia")
-        elementos = []
-        
-        estilos = getSampleStyleSheet()
-        estilo_titulo = ParagraphStyle('TituloStyle', parent=estilos['Heading1'], fontSize=18, leading=22, alignment=1, spaceAfter=20)
-        estilo_texto = ParagraphStyle('TextoStyle', parent=estilos['Normal'], fontSize=10, leading=12)
-        estilo_cabecalho = ParagraphStyle('CabecalhoStyle', parent=estilos['Normal'], fontSize=11, leading=13, fontName="Helvetica-Bold", textColor=colors.whitesmoke)
-        
-        data_impressao = datetime.now().strftime("%d/%m/%Y %H:%M")
-        elementos.append(Paragraph(f"<b>RELATÓRIO DE VIGILÂNCIA E ACESSOS</b><br/><font size=10>Gerado em: {data_impressao}</font>", estilo_titulo))
-        elementos.append(Spacer(1, 15))
-        
-        dados_tabela = [[Paragraph("Data/Hora", estilo_cabecalho), Paragraph("Nº", estilo_cabecalho), Paragraph("Nome do Aluno", estilo_cabecalho), Paragraph("Quarto", estilo_cabecalho), Paragraph("Movimento", estilo_cabecalho)]]
-        
-        for r in dados:
-            dados_tabela.append([
-                Paragraph(r["Data/Hora"], estilo_texto),
-                Paragraph(r["Número"], estilo_texto),
-                Paragraph(r["Nome"], estilo_texto),
-                Paragraph(r["Quarto"], estilo_texto),
-                Paragraph(f"<b>{r['Movimento']}</b>", estilo_texto)
-            ])
-        
-        tabela = Table(dados_tabela, colWidths=[120, 40, 180, 100, 80])
-        tabela.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1E3A8A')),
-            ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#F3F4F6')]),
-            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E5E7EB')),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 6),
-            ('TOPPADDING', (0,0), (-1,-1), 6),
-        ]))
-        
-        elementos.append(tabela)
-        doc.build(elementos)
-        buffer.seek(0)
-        return buffer
-
-    col_arq1, col_arq2 = st.columns(2)
-    with col_arq1:
-        pdf_data = gerar_pdf(st.session_state.livro_registo)
-        st.download_button(label="📄 Descarregar PDF", data=pdf_data, file_name="relatorio_acessos.pdf", mime="application/pdf", use_container_width=True)
-    with col_arq2:
-        csv = df_registo.to_csv(index=False).encode('utf-8')
-        st.download_button(label="📊 Descarregar Excel/CSV", data=csv, file_name="registo_acessos.csv", mime="text/csv", use_container_width=True)
-else:
-    st.info("Nenhum movimento registado neste turno.")
