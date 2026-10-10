@@ -175,7 +175,7 @@ with col_direita:
     else:
         st.info("Nenhum movimento registado neste turno.")
 
-# --- BOTÃO DO PDF OFICIAL ATIVADO E FIXO ---
+# --- BOTÃO DO PDF OFICIAL CORRIGIDO FIXO NO FUNDO ---
 st.write("---")
 st.write("### ⬇️ Exportar Relatório de Final de Dia")
 
