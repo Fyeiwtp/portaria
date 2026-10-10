@@ -306,7 +306,7 @@ st.write("")
 # ============================================================
 # PDF VERDADEIRO
 # ============================================================
-def criar_pdf(df, titulo_relatorio, periodo):
+def criar_pdf(df, titulo_relatorio, periodo, intervalo_calendario=False):
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -348,8 +348,9 @@ def criar_pdf(df, titulo_relatorio, periodo):
     elementos = [
         Paragraph(html.escape(titulo_relatorio), estilo_titulo),
         Paragraph(
-            f"<b>Período operacional:</b> {html.escape(periodo)} "
-            f"(01:00 até 00:59 do dia seguinte)",
+            (f"<b>Datas selecionadas:</b> {html.escape(periodo)} (00:00 às 23:59)"
+             if intervalo_calendario else
+             f"<b>Período operacional:</b> {html.escape(periodo)} (01:00 até 00:59 do dia seguinte)"),
             estilos["Normal"],
         ),
         Paragraph(
@@ -584,59 +585,66 @@ with col_direita:
 st.write("---")
 st.markdown('<div class="section-title">⬇️ Relatórios e exportações</div>', unsafe_allow_html=True)
 
-periodos_df = carregar_movimentos()
-periodos_disponiveis = sorted(
-    periodos_df["Dia Operacional"].dropna().unique().tolist(),
-    reverse=True,
-) if not periodos_df.empty else []
+st.caption("Escolhe o dia anterior ou um intervalo de datas. O PDF inclui movimentos entre as 00:00 da primeira data e as 23:59 da última.")
 
-if periodos_disponiveis:
-    periodo_escolhido = st.selectbox(
-        "Escolha o dia operacional para descarregar:",
-        options=periodos_disponiveis,
-        index=0,
-    )
+hoje = agora_local().date()
+ontem = hoje - timedelta(days=1)
+col_inicio, col_fim = st.columns(2)
+with col_inicio:
+    data_inicio = st.date_input("📅 Data inicial", value=ontem, format="DD/MM/YYYY", key="relatorio_inicio")
+with col_fim:
+    data_fim = st.date_input("📅 Data final", value=ontem, format="DD/MM/YYYY", key="relatorio_fim")
+
+if data_inicio > data_fim:
+    st.error("A data inicial não pode ser posterior à data final.")
 else:
-    periodo_escolhido = periodo_operacional()
-    st.info("Ainda não existem movimentos guardados. Pode descarregar um relatório vazio.")
+    df_todos = carregar_movimentos()
+    if df_todos.empty:
+        df_export = pd.DataFrame(columns=["Data/Hora", "Quarto", "Nome do Aluno", "Movimento", "Origem"])
+    else:
+        # A base de dados conserva a data como DD/MM/AAAA HH:MM:SS, por vezes com fuso no fim.
+        # Converter apenas os 19 primeiros caracteres permite consultar registos antigos e novos.
+        datas_movimentos = pd.to_datetime(
+            df_todos["Data/Hora"].astype(str).str.slice(0, 19),
+            format="%d/%m/%Y %H:%M:%S", errors="coerce"
+        )
+        filtro = (datas_movimentos.dt.date >= data_inicio) & (datas_movimentos.dt.date <= data_fim)
+        df_export = df_todos.loc[filtro, ["Data/Hora", "Quarto", "Nome do Aluno", "Movimento", "Origem"]].copy()
+        df_export["_ordem"] = datas_movimentos.loc[filtro]
+        df_export = df_export.sort_values("_ordem", kind="stable").drop(columns="_ordem")
 
-df_export = carregar_movimentos(periodo_escolhido)
-df_export_tabela = (
-    df_export[["Data/Hora", "Quarto", "Nome do Aluno", "Movimento", "Origem"]]
-    if not df_export.empty
-    else pd.DataFrame([{
-        "Data/Hora": "-",
-        "Quarto": "-",
-        "Nome do Aluno": "-",
-        "Movimento": "-",
-        "Origem": "-",
-    }])
-)
+    rotulo = f"{data_inicio.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')}"
+    st.info(f"📋 {len(df_export)} movimento(s) encontrado(s) de {rotulo}.")
+    if not df_export.empty:
+        with st.expander("👁️ Ver movimentos deste período"):
+            st.dataframe(df_export, use_container_width=True, hide_index=True)
 
-pdf_bytes = criar_pdf(df_export_tabela, "RELATÓRIO DE PORTARIA E VIGILÂNCIA", periodo_escolhido)
-csv_bytes = df_export_tabela.to_csv(index=False).encode("utf-8-sig")
+    pdf_bytes = criar_pdf(df_export, "RELATÓRIO DE PORTARIA E VIGILÂNCIA", rotulo, intervalo_calendario=True)
+    csv_bytes = df_export.to_csv(index=False).encode("utf-8-sig")
+    nome_intervalo = f"{data_inicio.isoformat()}_a_{data_fim.isoformat()}"
+    col_pdf, col_csv = st.columns(2)
+    with col_pdf:
+        st.download_button(
+            "📄 Descarregar PDF das datas selecionadas",
+            data=pdf_bytes,
+            file_name=f"relatorio_portaria_{nome_intervalo}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+        )
+    with col_csv:
+        st.download_button(
+            "📊 Descarregar CSV das datas selecionadas",
+            data=csv_bytes,
+            file_name=f"relatorio_portaria_{nome_intervalo}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
 
-col_pdf, col_csv = st.columns(2)
-with col_pdf:
-    st.download_button(
-        "📄 Descarregar PDF do dia selecionado",
-        data=pdf_bytes,
-        file_name=f"relatorio_portaria_{periodo_escolhido}.pdf",
-        mime="application/pdf",
-        use_container_width=True,
-    )
-with col_csv:
-    st.download_button(
-        "📊 Descarregar CSV do dia selecionado",
-        data=csv_bytes,
-        file_name=f"relatorio_portaria_{periodo_escolhido}.csv",
-        mime="text/csv",
-        use_container_width=True,
-    )
+st.caption("O fecho automático das 01:00 continua ativo; esta seleção por datas é independente e não altera os registos.")
 
 # Fechos arquivados
 st.write("---")
-st.markdown('<div class="section-title">🗂️ Relatórios automáticos arquivados</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-title">🗂️ PDFs automáticos arquivados (opcional)</div>', unsafe_allow_html=True)
 st.caption(
     "O fecho é feito quando a aplicação está em execução e é executada depois das 01:00. "
     "Para garantir o fecho mesmo com a aplicação desligada, é necessário agendar uma tarefa "
