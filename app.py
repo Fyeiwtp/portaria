@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import io
 
 st.set_page_config(page_title="Portaria e Quartos", page_icon="📝", layout="wide")
 
@@ -62,7 +61,7 @@ st.write("### 🧹 Consulta Rápida para Equipas de Limpeza")
 quarto_limpeza = st.selectbox("Selecione o quarto para saber se está livre para limpar:", options=opcoes_pesquisa, key="limpeza_check")
 
 if quarto_limpeza != "-- Clique para digitar Quarto ou Nome --":
-    q_limpo = quarto_limpeza.split(" | ")[0]
+    q_limpo = quarto_limpeza.split(" | ")
     historico_quarto = [r for r in st.session_state.livro_registo if r["Quarto"] == f"Quarto {q_limpo}"]
     
     if historico_quarto:
@@ -97,12 +96,12 @@ with col_esquerda:
         saida = st.button("📤 Registar SAÍDA", use_container_width=True)
 
     if (entrada or saida) and escolha != "-- Clique para digitar Quarto ou Nome --":
-        quarto_escolhido = escolha.split(" | ")[0]
+        quarto_escolhido = escolha.split(" | ")
         aluno = st.session_state.alunos_db[st.session_state.alunos_db['Numero'] == quarto_escolhido]
         
         if not aluno.empty:
-            nome_aluno = aluno.iloc[0]['Nome']
-            num_quarto = aluno.iloc[0]['Numero']
+            nome_aluno = aluno.iloc['Nome']
+            num_quarto = aluno.iloc['Numero']
             hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
             tipo_movimento = "ENTRADA" if entrada else "SAÍDA"
             
@@ -125,36 +124,30 @@ with col_direita:
     else:
         st.info("Nenhum movimento registado neste turno.")
 
-# --- BOTÕES DE EXPORTAÇÃO SEGUROS UTILIZANDO SISTEMA NATIVO ---
+# --- BOTÕES DE EXPORTAÇÃO DIRETOS (100% Livres de módulos externos) ---
 st.write("---")
 st.write("### ⬇️ Exportar Relatório de Final de Dia")
 
 df_export = pd.DataFrame(st.session_state.livro_registo if st.session_state.livro_registo else [{"Data/Hora": "-", "Quarto": "-", "Nome do Aluno": "-", "Movimento": "-"}])
 
-# 1. Gerador Oficial de Excel em memória
-buffer_excel = io.BytesIO()
-with pd.ExcelWriter(buffer_excel, engine='xlsxwriter') as writer:
-    df_export.to_excel(writer, sheet_name='Registo Turno', index=False)
-buffer_excel.seek(0)
+csv_dados = df_export.to_csv(index=False).encode('utf-8')
+texto_dados = df_export.to_string(index=False)
 
-# 2. Gerador Oficial de Texto Estruturado (Alternativa leve e limpa)
-string_texto = df_export.to_string(index=False)
-
-col_exp1, col_export2 = st.columns(2)
+col_exp1, col_exp2 = st.columns(2)
 
 with col_exp1:
     st.download_button(
-        label="📊 Descarregar Relatório Completo para Excel (.xlsx)",
-        data=buffer_excel,
-        file_name=f"relatorio_portaria_{datetime.now().strftime('%Y%m%d')}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        label="📊 Descarregar Relatório Completo para Excel (CSV)",
+        data=csv_dados,
+        file_name=f"relatorio_portaria_{datetime.now().strftime('%Y%m%d')}.csv",
+        mime="text/csv",
         use_container_width=True
     )
 
-with col_export2:
+with col_exp2:
     st.download_button(
         label="📄 Descarregar Livro de Ponto em Texto (.txt)",
-        data=string_texto,
+        data=texto_dados,
         file_name=f"relatorio_portaria_{datetime.now().strftime('%Y%m%d')}.txt",
         mime="text/plain",
         use_container_width=True
