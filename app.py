@@ -812,49 +812,11 @@ else:
             use_container_width=True,
         )
 
-st.caption("O fecho automático das 01:00 continua ativo; esta seleção por datas é independente e não altera os registos.")
-
-# Fechos arquivados
-st.write("---")
-st.markdown('<div class="section-title">🗂️ PDFs automáticos arquivados (opcional)</div>', unsafe_allow_html=True)
-st.caption(
-    "O fecho é feito quando a aplicação está em execução e é executada depois das 01:00. "
-    "Para garantir o fecho mesmo com a aplicação desligada, é necessário agendar uma tarefa "
-    "no servidor/PC ou usar um serviço de agendamento."
-)
-
-with ligar_bd() as conn:
-    fechados = conn.execute(
-        """
-        SELECT periodo, caminho_pdf, data_fecho
-        FROM relatorios_fechados
-        ORDER BY periodo DESC
-        """
-    ).fetchall()
-
-if fechados:
-    for item in fechados:
-        caminho = Path(item["caminho_pdf"])
-        col_info, col_download = st.columns([3, 1])
-        with col_info:
-            st.write(f"**Dia operacional:** {item['periodo']}")
-            st.caption(f"Fechado em: {datetime.fromisoformat(item['data_fecho']).strftime('%d/%m/%Y %H:%M:%S')}")
-        with col_download:
-            if caminho.exists():
-                st.download_button(
-                    "📥 Descarregar",
-                    data=caminho.read_bytes(),
-                    file_name=caminho.name,
-                    mime="application/pdf",
-                    key=f"download_{item['periodo']}",
-                    use_container_width=True,
-                )
-else:
-    st.info("Ainda não existem relatórios automáticos arquivados.")
+st.caption("Podes descarregar os relatórios PDF e CSV acima. Os registos continuam guardados no sistema.")
 
 # Não existe botão de apagar os movimentos nesta versão, para evitar perda acidental.
 st.sidebar.write("---")
 st.sidebar.info(
     "Os registos são guardados no ficheiro portaria_registos.sqlite3. "
-    "Faça cópias de segurança desse ficheiro e da pasta relatorios."
+    "Faça cópias de segurança desse ficheiro regularmente."
 )
