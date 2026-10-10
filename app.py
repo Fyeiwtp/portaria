@@ -55,13 +55,19 @@ if 'alunos_db' not in st.session_state:
 if 'livro_registo' not in st.session_state:
     st.session_state.livro_registo = []
 
+# Criar opções dinâmicas para a lista de pesquisa: "Quarto 110A - Nome" ou "Nome - Quarto 110A"
+opcoes_pesquisa = ["-- Clique para digitar Quarto ou Nome --"]
+for _, row in st.session_state.alunos_db.iterrows():
+    opcoes_pesquisa.append(f"{row['Numero']} | {row['Nome']}")
+
 # Criar a estrutura em duas colunas fixas
 col_esquerda, col_direita = st.columns(2, gap="large")
 
 with col_esquerda:
-    st.write("### 🔑 Entrada de Dados")
-    # Texto de ajuda atualizado para o vigilante saber que pode pesquisar por nome
-    pesquisa = st.text_input("Digite o Número do Quarto OU o Nome do Aluno:", placeholder="Ex: 110A ou Iara").strip()
+    st.write("### 🔍 Pesquisa e Entrada")
+    
+    # Esta caixa abre uma lista interativa onde pode pesquisar diretamente por texto
+    escolha = st.selectbox("Pesquise pelo Quarto ou pelo Nome do Aluno:", options=opcoes_pesquisa)
     
     col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
@@ -69,15 +75,13 @@ with col_esquerda:
     with col_btn2:
         saida = st.button("📤 Registar SAÍDA", use_container_width=True)
 
-    if (entrada or saida) and pesquisa:
-        # Pesquisa dupla: Procura coincidências no Número DO Quarto ou no Nome do Aluno (sem importar maiúsculas)
-        aluno = st.session_state.alunos_db[
-            (st.session_state.alunos_db['Numero'].str.upper() == pesquisa.upper()) | 
-            (st.session_state.alunos_db['Nome'].str.upper().str.contains(pesquisa.upper()))
-        ]
+    if (entrada or saida) and escolha != "-- Clique para digitar Quarto ou Nome --":
+        # Extrair o número do quarto a partir da escolha selecionada
+        quarto_escolhido = escolha.split(" | ")[0]
+        
+        aluno = st.session_state.alunos_db[st.session_state.alunos_db['Numero'] == quarto_escolhido]
         
         if not aluno.empty:
-            # Se encontrar mais do que um (ex: digitar apenas um apelido comum), pega no primeiro encontrado
             aluno_fixo = aluno.iloc[0]
             nome_aluno = aluno_fixo['Nome']
             num_quarto = aluno_fixo['Numero']
@@ -96,8 +100,6 @@ with col_esquerda:
                 st.success(f"✅ Registada ENTRADA para {nome_aluno} ({num_quarto})")
             else:
                 st.warning(f"🚪 Registada SAÍDA para {nome_aluno} ({num_quarto})")
-        else:
-            st.error(f"⚠️ Nenhhum aluno ou quarto encontrado para: '{pesquisa}'")
 
 with col_direita:
     st.write("### 🕒 Histórico do Turno (Lado Direito)")
@@ -134,7 +136,7 @@ def gerar_pdf(dados):
             Paragraph(f"<b>{r.get('Movimento', '-')}</b>", estilo_texto)
         ])
     
-    tabela = Table(dados_tab, colWidths=[110, 70, 240, 90])
+    tabela = Table(dados_tab, colWidths=[120, 80, 220, 80])
     tabela.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1E3A8A')),
         ('ALIGN', (0,0), (-1,-1), 'LEFT'),
