@@ -9,7 +9,8 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
-st.set_page_config(page_title="Registo de Portaria e Quartos", page_icon="📝", layout="centered")
+# Configuração da página em modo "Largo" para caber o histórico à direita
+st.set_page_config(page_title="Registo de Portaria e Quartos", page_icon="📝", layout="wide")
 
 st.title("📝 Registo Automatizado de Vigilância")
 st.subheader("Controlo de Quartos com Exportação em PDF")
@@ -99,7 +100,7 @@ if 'alunos_db' not in st.session_state:
         {"Numero": "227A", "Nome": "Gabrielle Cristina da Silva", "Quarto": "Quarto 227A"},
         {"Numero": "227B", "Nome": "Joana Isabel Pereira Reis Rato", "Quarto": "Quarto 227B"},
         {"Numero": "228A", "Nome": "Luana Filipa da Silva Cabral", "Quarto": "Quarto 228A"},
-        {"Numero": "228B", "Jéssica Inês Alves Teixeira": "Jéssica Inês Alves Teixeira", "Quarto": "Quarto 228B"},
+        {"Numero": "228B", "Nome": "Jéssica Inês Alves Teixeira", "Quarto": "Quarto 228B"},
         {"Numero": "229A", "Nome": "Maria Inês Figueiredo Bentes", "Quarto": "Quarto 229A"},
         {"Numero": "229B", "Nome": "Mariana Alves Barrinha", "Quarto": "Quarto 229B"},
         {"Numero": "230A", "Nome": "Helena Isabel Ramos da Costa", "Quarto": "Quarto 230A"},
@@ -111,26 +112,28 @@ if 'alunos_db' not in st.session_state:
 if 'livro_registo' not in st.session_state:
     st.session_state.livro_registo = []
 
-st.write("### 🔍 Registo por Número de Quarto")
-num_introduzido = st.text_input("Introduza o Número do Quarto (Ex: 110A, 215B):", placeholder="Ex: 110A", key="num_aluno").strip()
+# Criar duas colunas fixas: Esquerda (Controlo) e Direita (Histórico)
+col_esquerda, col_direita = st.columns([1, 1], gap="large")
 
-col1, col2 = st.columns(2)
-with col1:
-    entrada = st.button("📥 Registar ENTRADA", type="primary", use_container_width=True)
-with col2:
-    saida = st.button("📤 Registar SAÍDA", use_container_width=True)
+with col_esquerda:
+    st.write("### 🛏️ Entrada de Dados")
+    num_introduzido = st.text_input("Introduza o Número do Quarto (Ex: 110A, 215B):", placeholder="Ex: 110A", key="num_aluno").strip()
 
-if (entrada or saida) and num_introduzido:
-    aluno = st.session_state.alunos_db[st.session_state.alunos_db['Numero'].str.lower() == num_introduzido.lower()]
-    if not aluno.empty:
-        # CORREÇÃO DA EXTRAÇÃO DO TEXTO (Usando indexação correta do Pandas)
-        nome_aluno = aluno.iloc[0]['Nome']
-        quarto_aluno = aluno.iloc[0]['Quarto']
-        hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        tipo_movimento = "ENTRADA" if entrada else "SAÍDA"
-        st.session_state.livro_registo.append({"Data/Hora": hora_atual, "Quarto": quarto_aluno, "Nome do Aluno": nome_aluno, "Movimento": tipo_movimento})
-        st.success(f"✅ Registada {tipo_movimento}: {nome_aluno} ({quarto_aluno}) às {hora_atual}")
-    else:
-        st.error(f"⚠️ O quarto '{num_introduzido}' não foi encontrado na base de dados.")
+    col_btn1, col_btn2 = st.columns(2)
+    with col_btn1:
+        entrada = st.button("📥 Registar ENTRADA", type="primary", use_container_width=True)
+    with col_btn2:
+        saida = st.button("📤 Registar SAÍDA", use_container_width=True)
 
-st.write("---")
+    if (entrada or saida) and num_introduzido:
+        aluno = st.session_state.alunos_db[st.session_state.alunos_db['Numero'].str.lower() == num_introduzido.lower()]
+        if not aluno.empty:
+            nome_aluno = aluno.iloc[0]['Nome']
+            quarto_aluno = aluno.iloc[0]['Quarto']
+            hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            tipo_movimento = "ENTRADA" if entrada else "SAÍDA"
+            
+            # Adiciona o movimento à lista do turno
+            st.session_state.livro_registo.append({
+                "Data/Hora": hora_atual,
+                "Quarto": quarto_aluno,
