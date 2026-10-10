@@ -531,63 +531,49 @@ col_esquerda, col_direita = st.columns(2, gap="large")
 
 with col_esquerda:
     st.markdown('<div class="section-title">🔍 Registo de entradas e saídas</div>', unsafe_allow_html=True)
-    # Pesquisa por quarto ou nome. Quando há apenas uma correspondência,
-    # a seleção é automática; com várias, o utilizador escolhe na lista.
-    import unicodedata
-
-    def normalizar_busca(valor):
-        valor = unicodedata.normalize("NFKD", str(valor).casefold())
-        return "".join(c for c in valor if not unicodedata.combining(c)).strip()
-
+    # O selectbox do Streamlit mostra sugestões ENQUANTO se escreve,
+    # ao contrário de text_input, que só aplica o valor após Enter.
     mapa_quartos = {str(r["Numero"]).strip().upper(): str(r["Nome"]) for _, r in alunos_db.iterrows()}
-    if "pesquisa_quarto" not in st.session_state:
-        st.session_state.pesquisa_quarto = ""
-    if "pesquisa_nome_texto" not in st.session_state:
-        st.session_state.pesquisa_nome_texto = ""
+    opcoes_nomes = [f"{nome} | Quarto {quarto}" for quarto, nome in mapa_quartos.items()]
+    opcoes_por_quarto = {f"{nome} | Quarto {quarto}": quarto for quarto, nome in mapa_quartos.items()}
 
-    def atualizar_pelo_quarto():
-        quarto = st.session_state.pesquisa_quarto.strip().upper()
+    def escolher_pelo_quarto():
+        quarto = st.session_state.get("pesquisa_quarto_sugestoes", "").strip().upper()
         if quarto in mapa_quartos:
-            st.session_state.pesquisa_nome_texto = mapa_quartos[quarto]
-
-    def atualizar_pelo_nome():
-        pesquisa = normalizar_busca(st.session_state.pesquisa_nome_texto)
-        if not pesquisa:
-            return
-        correspondencias = [q for q, nome in mapa_quartos.items() if pesquisa in normalizar_busca(nome)]
-        if len(correspondencias) == 1:
-            quarto = correspondencias[0]
-            st.session_state.pesquisa_quarto = quarto
-            st.session_state.pesquisa_nome_texto = mapa_quartos[quarto]
+            st.session_state["pesquisa_nome_sugestoes"] = next(
+                opcao for opcao, q in opcoes_por_quarto.items() if q == quarto
+            )
         else:
-            st.session_state.pesquisa_quarto = ""
+            st.session_state["pesquisa_nome_sugestoes"] = None
 
-    st.text_input("🔢 Número do quarto", placeholder="Ex.: 110A", key="pesquisa_quarto", on_change=atualizar_pelo_quarto)
-    st.text_input("👤 Nome do aluno", placeholder="Escreve o nome do aluno…", key="pesquisa_nome_texto", on_change=atualizar_pelo_nome)
+    def escolher_pelo_nome():
+        opcao = st.session_state.get("pesquisa_nome_sugestoes")
+        if opcao in opcoes_por_quarto:
+            st.session_state["pesquisa_quarto_sugestoes"] = opcoes_por_quarto[opcao]
 
-    pesquisa = normalizar_busca(st.session_state.pesquisa_nome_texto)
-    correspondencias = [(q, nome) for q, nome in mapa_quartos.items() if pesquisa and pesquisa in normalizar_busca(nome)]
-    quarto_texto = st.session_state.pesquisa_quarto.strip().upper()
-    quarto_escolhido = None
+    st.text_input(
+        "🔢 Número do quarto", placeholder="Ex.: 110A",
+        key="pesquisa_quarto_sugestoes", on_change=escolher_pelo_quarto,
+    )
+    st.selectbox(
+        "👤 Nome do aluno",
+        options=opcoes_nomes,
+        index=None,
+        placeholder="Clica e escreve o nome para ver sugestões…",
+        key="pesquisa_nome_sugestoes",
+        on_change=escolher_pelo_nome,
+        help="Escreve parte do nome dentro da lista. As sugestões aparecem imediatamente; escolhe o aluno.",
+    )
 
-    if quarto_texto in mapa_quartos:
-        quarto_escolhido = quarto_texto
-    elif len(correspondencias) == 1:
-        quarto_escolhido = correspondencias[0][0]
-    elif len(correspondencias) > 1:
-        st.caption(f"{len(correspondencias)} alunos encontrados. Seleciona o correto:")
-        opcoes = [f"{nome} | Quarto {q}" for q, nome in correspondencias]
-        opcao = st.selectbox("Alunos encontrados", options=opcoes, index=None,
-                             placeholder="Seleciona o aluno…", key="nome_ambiguo")
-        if opcao:
-            quarto_escolhido = correspondencias[opcoes.index(opcao)][0]
-    elif quarto_texto and quarto_texto not in mapa_quartos:
-        st.caption("Quarto não encontrado. Confirma o número.")
-    elif pesquisa:
-        st.caption("Nenhum aluno encontrado.")
-
+    opcao_atual = st.session_state.get("pesquisa_nome_sugestoes")
+    quarto_digitado = st.session_state.get("pesquisa_quarto_sugestoes", "").strip().upper()
+    quarto_escolhido = opcoes_por_quarto.get(opcao_atual)
+    if quarto_escolhido is None and quarto_digitado in mapa_quartos:
+        quarto_escolhido = quarto_digitado
     if quarto_escolhido:
         st.success(f"**Quarto {quarto_escolhido}** — {mapa_quartos[quarto_escolhido]}")
+    elif quarto_digitado:
+        st.caption("Quarto não encontrado. Confirma o número.")
 
     col_btn1, col_btn2 = st.columns(2)
 
