@@ -1054,13 +1054,9 @@ with st.expander("⚠️ Reiniciar todos os registos"):
     )
 
     with st.form("form_reiniciar_tudo"):
-        confirmacao_reset = st.text_input(
-            "Escreva APAGAR para confirmar"
-        )
-
+        confirmacao_reset = st.text_input("Escreva APAGAR para confirmar")
         reiniciar_tudo = st.form_submit_button(
-            "🗑️ Apagar tudo e começar do zero",
-            type="primary",
+            "🗑️ Apagar tudo e começar do zero", type="primary"
         )
 
     if reiniciar_tudo:
@@ -1073,27 +1069,22 @@ with st.expander("⚠️ Reiniciar todos os registos"):
                     conn.execute("DELETE FROM movimentos")
                     conn.execute("DELETE FROM fichas_portaria")
                     conn.execute("DELETE FROM relatorios_fechados")
-
             except Exception as exc:
-                st.error(
-                    f"Não foi possível reiniciar os registos: {exc}"
-                )
+                st.error(f"Não foi possível reiniciar os registos: {exc}")
             else:
                 falhas_pdf = []
-
-                for ficheiro in PASTA_RELATORIOS.glob(
-                    "relatorio_portaria_*.pdf"
-                ):
+                for ficheiro in PASTA_RELATORIOS.glob("relatorio_portaria_*.pdf"):
                     try:
                         ficheiro.unlink()
                     except OSError:
                         falhas_pdf.append(ficheiro.name)
-
                 if falhas_pdf:
+                    # Impede continuar a mostrar o PDF eliminado da base de dados.
+                    st.session_state.pop("ficha_download", None)
+                    st.session_state.pop("download_tentado", None)
                     st.warning(
-                        "Os registos foram apagados, mas alguns "
-                        "PDFs arquivados não puderam ser removidos. "
-                        "Remova-os da pasta relatorios."
+                        "Os registos foram apagados, mas alguns PDFs arquivados "
+                        "não puderam ser removidos. Remova-os da pasta relatorios."
                     )
                 else:
                     st.session_state.clear()
