@@ -531,7 +531,7 @@ col_esquerda, col_direita = st.columns(2, gap="large")
 
 with col_esquerda:
     st.markdown('<div class="section-title">🔍 Registo de entradas e saídas</div>', unsafe_allow_html=True)
-    # Pesquisa direta por quarto ou nome, sem menu suspenso a tapar os botões.
+    # Pesquisa por quarto ou nome, com escolha explícita quando há vários resultados.
     # Quando há uma correspondência única, o outro campo é preenchido automaticamente.
     mapa_quartos = {str(r["Numero"]).strip().upper(): str(r["Nome"]) for _, r in alunos_db.iterrows()}
     mapa_nomes = {str(r["Nome"]).strip(): str(r["Numero"]) for _, r in alunos_db.iterrows()}
@@ -573,11 +573,29 @@ with col_esquerda:
             st.caption("Quarto não encontrado. Confirma o número.")
     else:
         if nome_texto:
-            nomes_encontrados = [n for n in mapa_nomes if nome_texto.casefold() in n.casefold()]
-            if len(nomes_encontrados) == 1:
-                quarto_escolhido = mapa_nomes[nomes_encontrados[0]]
-            elif len(nomes_encontrados) > 1:
-                st.caption("Há vários alunos com esse nome. Escreve mais letras para identificar um só.")
+            # Mostra todas as correspondências, mesmo quando há nomes repetidos.
+            encontrados = [
+                (str(r["Numero"]), str(r["Nome"]))
+                for _, r in alunos_db.iterrows()
+                if nome_texto.casefold() in str(r["Nome"]).casefold()
+            ]
+            if len(encontrados) == 1:
+                quarto_escolhido = encontrados[0][0]
+            elif len(encontrados) > 1:
+                st.caption(f"🔎 {len(encontrados)} alunos encontrados. Escolhe o correto:")
+                opcoes = ["— Seleciona um aluno —"] + [
+                    f"{nome} | Quarto {quarto}" for quarto, nome in encontrados
+                ]
+                # Uma chave por pesquisa impede que fique selecionado um aluno de outra pesquisa.
+                escolhido = st.selectbox(
+                    "Resultados da pesquisa",
+                    options=opcoes,
+                    key=f"resultado_nome_{nome_texto.casefold()}",
+                    label_visibility="collapsed",
+                )
+                if escolhido != opcoes[0]:
+                    indice = opcoes.index(escolhido) - 1
+                    quarto_escolhido = encontrados[indice][0]
             else:
                 st.caption("Aluno não encontrado.")
 
@@ -611,7 +629,7 @@ with col_esquerda:
                 st.success(f"Registada {tipo} para {nome_aluno}.")
                 st.rerun()
     elif (entrada or saida) and quarto_escolhido is None:
-        st.warning("Escreve um quarto ou um nome que identifique um único aluno.")
+        st.warning("Seleciona um aluno da lista ou escreve um quarto válido.")
 
 with col_direita:
     st.markdown('<div class="section-title">🕒 Histórico de movimentos</div>', unsafe_allow_html=True)
