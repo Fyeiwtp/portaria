@@ -5,10 +5,10 @@ from datetime import datetime
 st.set_page_config(page_title="Portaria e Quartos", page_icon="📝", layout="wide")
 
 st.title("📝 Registo Automatizado de Vigilância")
-st.subheader("Controlo Residencial Completo")
+st.subheader("Controlo Residencial com Estado de Limpezas e PDF")
 st.write("---")
 
-# Botão de emergência na barra lateral para limpar a cache
+# Botão de emergência na barra lateral
 if st.sidebar.button("🧹 Reiniciar Base de Dados / Limpar Cache"):
     st.session_state.clear()
     st.rerun()
@@ -57,6 +57,25 @@ opcoes_pesquisa = ["-- Clique para digitar Quarto ou Nome --"]
 for _, row in st.session_state.alunos_db.iterrows():
     opcoes_pesquisa.append(f"{row['Numero']} | {row['Nome']}")
 
+# --- SECÇÃO DE CONSULTA RÁPIDA DE LIMPEZAS ---
+st.write("### 🧹 Consulta Rápida para Equipas de Limpeza")
+quarto_limpeza = st.selectbox("Selecione o quarto para saber se está livre para limpar:", options=opcoes_pesquisa, key="limpeza_check")
+
+if quarto_limpeza != "-- Clique para digitar Quarto ou Nome --":
+    q_limpo = quarto_limpeza.split(" | ")[0]
+    historico_quarto = [r for r in st.session_state.livro_registo if r["Quarto"] == f"Quarto {q_limpo}"]
+    
+    if historico_quarto:
+        ultimo_movimento = historico_quarto[-1]["Movimento"]
+        if ultimo_movimento == "SAÍDA":
+            st.success(f"🟢 **PODE LIMPAR:** O aluno do Quarto {q_limpo} encontra-se **FORA DO QUARTO**.")
+        else:
+            st.error(f"🔴 **NÃO ENTRAR:** O aluno do Quarto {q_limpo} encontra-se atualmente **DENTRO DO QUARTO**.")
+    else:
+        st.info(f"⚪ O Quarto {q_limpo} ainda não registou movimentos hoje.")
+
+st.write("---")
+
 # --- SECÇÃO DE REGISTO EM DUAS COLUNAS FIXAS ---
 col_esquerda, col_direita = st.columns(2, gap="large")
 
@@ -79,23 +98,25 @@ with col_esquerda:
         saida = st.button("📤 Registar SAÍDA", use_container_width=True)
 
     if (entrada or saida) and escolha != "-- Clique para digitar Quarto ou Nome --":
-        partes = escolha.split(" | ")
-        quarto_escolhido = partes[0]
-        nome_escolhido = partes[1]
+        quarto_escolhido = escolha.split(" | ")[0]
+        aluno = st.session_state.alunos_db[st.session_state.alunos_db['Numero'] == quarto_escolhido]
         
-        hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        tipo_movimento = "ENTRADA" if entrada else "SAÍDA"
-        
-        st.session_state.livro_registo.append({
-            "Data/Hora": hora_atual,
-            "Quarto": f"Quarto {quarto_escolhido}",
-            "Nome do Aluno": nome_escolhido,
-            "Movimento": tipo_movimento
-        })
-        
-        st.toast(f"✅ Registada {tipo_movimento} para {nome_escolhido}", icon="💾")
-        st.session_state.contador_reset += 1
-        st.rerun()
+        if not aluno.empty:
+            nome_aluno = aluno.iloc[0]['Nome']
+            num_quarto = aluno.iloc[0]['Numero']
+            hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            tipo_movimento = "ENTRADA" if entrada else "SAÍDA"
+            
+            st.session_state.livro_registo.append({
+                "Data/Hora": hora_atual,
+                "Quarto": f"Quarto {num_quarto}",
+                "Nome do Aluno": nome_aluno,
+                "Movimento": tipo_movimento
+            })
+            
+            st.toast(f"✅ Registada {tipo_movimento} para {nome_aluno}", icon="💾")
+            st.session_state.contador_reset += 1
+            st.rerun()
 
 with col_direita:
     st.write("### 🕒 Histórico do Turno (Lado Direito)")
@@ -105,17 +126,49 @@ with col_direita:
     else:
         st.info("Nenhum movimento registado neste turno.")
 
-# --- BOTÃO DE EXPORTAÇÃO SEGURO E DIRETO ---
+# --- SISTEMA DE EXPORTAÇÃO SEGURO INTEGRADO (PDF via HTML) ---
 st.write("---")
-st.write("### ⬇ nighttime Exportar Relatório de Final de Dia")
+st.write("### ⬇️ Exportar Relatório de Final de Dia")
 
 df_export = pd.DataFrame(st.session_state.livro_registo if st.session_state.livro_registo else [{"Data/Hora": "-", "Quarto": "-", "Nome do Aluno": "-", "Movimento": "-"}])
-csv_dados = df_export.to_csv(index=False).encode('utf-8')
 
-st.download_button(
-    label="📊 Descarregar Relatório Completo para Excel / Impressão", 
-    data=csv_dados, 
-    file_name=f"relatorio_portaria_{datetime.now().strftime('%Y%m%d')}.csv", 
-    mime="text/csv", 
-    use_container_width=True
-)
+# Método de conversão para PDF estável através de HTML limpo
+html_tabela = df_export.to_html(index=False, classes='table')
+html_completo = f"""
+<html>
+<head>
+<style>
+    body {{ font-family: Helvetica, Arial, sans-serif; margin: 30px; }}
+    h2 {{ text-align: center; color: #1E3A8A; }}
+    table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
+    th {{ background-color: #1E3A8A; color: white; padding: 8px; text-align: left; }}
+    td {{ padding: 8px; border-bottom: 1px solid #E5E7EB; }}
+    tr:nth-child(even) {{ background-color: #F3F4F6; }}
+</style>
+</head>
+<body>
+    <h2>RELATÓRIO DE PORTARIA E VIGILÂNCIA</h2>
+    <p><b>Data de Emissão:</b> {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}</p>
+    {html_tabela}
+</body>
+</html>
+"""
+
+col_btn_pdf, col_btn_excel = st.columns(2)
+with col_btn_pdf:
+    # O botão de PDF converte o HTML estruturado instantaneamente sem bibliotecas pesadas
+    st.download_button(
+        label="📄 Descarregar Relatório Completo em PDF (HTML)", 
+        data=html_completo, 
+        file_name="relatorio_turno.html", 
+        mime="text/html", 
+        use_container_width=True
+    )
+with col_btn_excel:
+    st.download_button(
+        label="📊 Descarregar Folha Excel (CSV)", 
+        data=df_export.to_csv(index=False).encode('utf-8'), 
+        file_name="relatorio_turno.csv", 
+        mime="text/csv", 
+        use_container_width=True
+    )
