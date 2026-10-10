@@ -531,31 +531,66 @@ col_esquerda, col_direita = st.columns(2, gap="large")
 
 with col_esquerda:
     st.markdown('<div class="section-title">🔍 Registo de entradas e saídas</div>', unsafe_allow_html=True)
-    # Pesquisa nativa do Streamlit: sugestões aparecem ao escrever,
-    # sem Enter e sem dependências adicionais.
-    import unicodedata
-
-    def normalizar_pesquisa(valor):
-        texto = unicodedata.normalize("NFKD", str(valor or ""))
-        return "".join(c for c in texto if not unicodedata.combining(c)).casefold()
-
-    mapa_quartos = {str(r["Numero"]).strip().upper(): str(r["Nome"]) for _, r in alunos_db.iterrows()}
-    opcoes_registo = ["-- Escolhe um aluno ou escreve o nome/quarto --"] + [
-        f"{nome} | Quarto {quarto}" for quarto, nome in mapa_quartos.items()
+    # Dois campos de pesquisa nativos com filtragem imediata ao escrever.
+    # As opções são filtradas no próprio menu, sem premir Enter.
+    mapa_quartos = {
+        str(r["Numero"]).strip().upper(): str(r["Nome"])
+        for _, r in alunos_db.iterrows()
+    }
+    vazio_quarto = "-- Selecionar quarto --"
+    vazio_nome = "-- Selecionar aluno --"
+    opcoes_quartos = [vazio_quarto] + [
+        f"{quarto} | {nome}" for quarto, nome in mapa_quartos.items()
     ]
-    escolha_registo = st.selectbox(
-        "🔎 Nome do aluno ou número do quarto",
-        options=opcoes_registo,
-        index=0,
-        key="pesquisa_registo_unica",
-        help="Clica no campo e começa a escrever o nome ou o número do quarto. A lista filtra imediatamente, sem Enter.",
+    opcoes_nomes = [vazio_nome] + [
+        f"{nome} | Quarto {quarto}"
+        for quarto, nome in sorted(mapa_quartos.items(), key=lambda x: x[1].casefold())
+    ]
+
+    def atualizar_pelo_quarto():
+        escolha = st.session_state.get("registo_pesquisa_quarto", vazio_quarto)
+        if escolha != vazio_quarto:
+            quarto = escolha.split(" | ", 1)[0]
+            st.session_state["registo_pesquisa_nome"] = (
+                f"{mapa_quartos[quarto]} | Quarto {quarto}"
+            )
+        else:
+            st.session_state["registo_pesquisa_nome"] = vazio_nome
+
+    def atualizar_pelo_nome():
+        escolha = st.session_state.get("registo_pesquisa_nome", vazio_nome)
+        if escolha != vazio_nome:
+            quarto = escolha.rsplit(" | Quarto ", 1)[-1]
+            st.session_state["registo_pesquisa_quarto"] = (
+                f"{quarto} | {mapa_quartos[quarto]}"
+            )
+        else:
+            st.session_state["registo_pesquisa_quarto"] = vazio_quarto
+
+    st.selectbox(
+        "🔢 Número do quarto",
+        options=opcoes_quartos,
+        key="registo_pesquisa_quarto",
+        on_change=atualizar_pelo_quarto,
+        help="Abre a lista e escreve o quarto. As sugestões filtram-se sem Enter.",
     )
-    if escolha_registo != opcoes_registo[0]:
-        quarto_escolhido = escolha_registo.rsplit(" | Quarto ", 1)[-1]
+    st.selectbox(
+        "👤 Nome do aluno",
+        options=opcoes_nomes,
+        key="registo_pesquisa_nome",
+        on_change=atualizar_pelo_nome,
+        help="Abre a lista e escreve o nome. Escolhe entre os resultados sem Enter.",
+    )
+    escolha_atual = st.session_state.get("registo_pesquisa_quarto", vazio_quarto)
+    quarto_escolhido = (
+        escolha_atual.split(" | ", 1)[0]
+        if escolha_atual != vazio_quarto else None
+    )
+    if quarto_escolhido in mapa_quartos:
         st.success(f"**{mapa_quartos[quarto_escolhido]} — Quarto {quarto_escolhido}**")
     else:
         quarto_escolhido = None
-        st.caption("Clica na caixa e escreve o nome ou o quarto para veres as sugestões imediatamente.")
+        st.caption("Clica num dos campos e começa a escrever para filtrar as sugestões.")
 
     col_btn1, col_btn2 = st.columns(2)
 
