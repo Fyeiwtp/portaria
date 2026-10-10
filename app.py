@@ -583,7 +583,13 @@ with col_esquerda:
         on_change=atualizar_pelo_nome,
         help="Clica e escreve o nome para filtrar sem Enter.",
     )
+    # O texto digitado no filtro do selectbox não constitui uma seleção.
+    # Só se considera o aluno confirmado após clicar numa sugestão.
     quarto_escolhido = st.session_state.get("registo_pesquisa_quarto")
+    nome_escolhido = st.session_state.get("registo_pesquisa_nome")
+    if quarto_escolhido in mapa_quartos and nome_escolhido != quarto_escolhido:
+        st.warning("Seleciona uma sugestão da lista para confirmar o aluno e sincronizar o quarto.")
+        quarto_escolhido = None
     if quarto_escolhido not in mapa_quartos:
         quarto_escolhido = None
 
