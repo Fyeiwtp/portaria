@@ -12,7 +12,7 @@ from reportlab.lib import colors
 st.set_page_config(page_title="Registo de Portaria e Quartos", page_icon="📝", layout="centered")
 
 st.title("📝 Registo Automatizado de Vigilância")
-st.subheader("Controlo de Quartos com Pesquisa Instantânea e PDF")
+st.subheader("Controlo de Quartos com Exportação em PDF")
 st.write("---")
 
 # LISTA OFICIAL DE ALUNOS E QUARTOS
@@ -111,32 +111,33 @@ if 'alunos_db' not in st.session_state:
 if 'livro_registo' not in st.session_state:
     st.session_state.livro_registo = []
 
-# Criar opções legíveis para a pesquisa: "Quarto X - Nome do Aluno"
-opcoes_alunos = ["-- Selecione ou digite o número do quarto --"] + [
-    f"Quarto {row['Numero']} - {row['Nome']}" for _, row in st.session_state.alunos_db.iterrows()
-]
+st.write("### 🔍 Registo por Número de Quarto")
+num_introduzido = st.text_input("Introduza o Número do Quarto (Ex: 110A, 215B):", placeholder="Ex: 110A", key="num_aluno").strip()
 
-st.write("### 🔍 Pesquisa Instantânea de Aluno")
-escolha = st.selectbox("Comece a digitar o número do quarto para pesquisar:", options=opcoes_alunos)
+col1, col2 = st.columns(2)
+with col1:
+    entrada = st.button("📥 Registar ENTRADA", type="primary", use_container_width=True)
+with col2:
+    saida = st.button("📤 Registar SAÍDA", use_container_width=True)
 
-if escolha != "-- Selecione ou digite o número do quarto --":
-    # Isolar a parte que contém apenas o número do quarto
-    parte_quarto = escolha.split(" - ")[0]
-    quarto_limpo = parte_quarto.replace("Quarto ", "")
+if (entrada or saida) and num_introduzido:
+    aluno = st.session_state.alunos_db[st.session_state.alunos_db['Numero'].str.lower() == num_introduzido.lower()]
     
-    # Localizar o registo correspondente
-    aluno_selecionado = st.session_state.alunos_db[st.session_state.alunos_db['Numero'] == quarto_limpo].iloc[0]
-    
-    nome_aluno = aluno_selecionado['Nome']
-    quarto_aluno = aluno_selecionado['Quarto']
-    
-    st.info(f"👤 **Aluno:** {nome_aluno} | 🛏️ **{quarto_aluno}**")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        entrada = st.button("📥 Registar ENTRADA", type="primary", use_container_width=True)
-    with col2:
-        saida = st.button("📤 Registar SAÍDA", use_container_width=True)
-        
-    if entrada or saida:
+    if not aluno.empty:
+        nome_aluno = aluno.iloc['Nome']
+        quarto_aluno = aluno.iloc['Quarto']
         hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        tipo_movimento = "ENTRADA" if entrada else "SAÍDA"
+        
+        st.session_state.livro_registo.append({
+            "Data/Hora": hora_atual,
+            "Quarto": quarto_aluno,
+            "Nome do Aluno": nome_aluno,
+            "Movimento": tipo_movimento
+        })
+        
+        if entrada:
+            st.success(f"✅ Registada ENTRADA: {nome_aluno} ({quarto_aluno}) às {hora_atual}")
+        else:
+            st.warning(f"🚪 Registada SAÍDA: {nome_aluno} ({quarto_aluno}) às {hora_atual}")
+    else:
