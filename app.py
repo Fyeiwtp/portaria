@@ -593,36 +593,65 @@ with col_esquerda:
     if quarto_escolhido not in mapa_quartos:
         quarto_escolhido = None
 
-    col_btn1, col_btn2 = st.columns(2)
+    # Callbacks dos botões correm antes da criação dos widgets no novo rerun.
+    # É seguro limpar os dois selectboxes aqui (não depois de st.button).
+    def registar_e_limpar(tipo):
+        quarto = st.session_state.get("registo_pesquisa_quarto")
+        nome_id = st.session_state.get("registo_pesquisa_nome")
+        if quarto not in mapa_quartos or nome_id != quarto:
+            st.session_state["aviso_registo"] = (
+                "warning", "Seleciona um aluno na lista antes de registar."
+            )
+            return
 
+        nome_aluno = mapa_quartos[quarto]
+        ultimo = ultimo_movimento_aluno(quarto, nome_aluno)
+        if ultimo and ultimo["movimento"] == tipo:
+            st.session_state["aviso_registo"] = (
+                "warning", f"{nome_aluno} já tem uma {tipo} como último registo. Não foi duplicada."
+            )
+            return
+
+        try:
+            adicionar_movimento(quarto, nome_aluno, tipo)
+        except Exception as exc:
+            st.session_state["aviso_registo"] = (
+                "error", f"Não foi possível guardar o registo: {exc}"
+            )
+            return
+
+        st.session_state["registo_pesquisa_quarto"] = vazio_quarto
+        st.session_state["registo_pesquisa_nome"] = vazio_nome
+        st.session_state["aviso_registo"] = (
+            "success", f"{tipo} registada para {nome_aluno} (Quarto {quarto})."
+        )
+
+    col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
-        entrada = st.button(
+        st.button(
             "📥 Registar ENTRADA",
             type="primary",
             use_container_width=True,
+            on_click=registar_e_limpar,
+            args=("ENTRADA",),
         )
     with col_btn2:
-        saida = st.button(
+        st.button(
             "📤 Registar SAÍDA",
             use_container_width=True,
+            on_click=registar_e_limpar,
+            args=("SAÍDA",),
         )
 
-    if (entrada or saida) and quarto_escolhido is not None:
-        aluno = alunos_db[alunos_db["Numero"] == quarto_escolhido]
-        if not aluno.empty:
-            nome_aluno = str(aluno.iloc[0]["Nome"])
-            tipo = "ENTRADA" if entrada else "SAÍDA"
-            ultimo_registo = ultimo_movimento_aluno(quarto_escolhido, nome_aluno)
-            if ultimo_registo and ultimo_registo["movimento"] == tipo:
-                st.warning(f"{nome_aluno} já tem uma {tipo} como último registo. Não foi duplicada.")
-            else:
-                adicionar_movimento(quarto_escolhido, nome_aluno, tipo)
-                # Limpa os dois campos depois de guardar o movimento.
-                st.session_state["registo_pesquisa_quarto"] = vazio_quarto
-                st.session_state["registo_pesquisa_nome"] = vazio_nome
-                st.rerun()
-    elif (entrada or saida) and quarto_escolhido is None:
-        st.warning("Seleciona um aluno ou escreve um quarto válido.")
+    aviso = st.session_state.pop("aviso_registo", None)
+    if aviso:
+        tipo_aviso, mensagem = aviso
+        if tipo_aviso == "success":
+            st.success(mensagem)
+        elif tipo_aviso == "warning":
+            st.warning(mensagem)
+        else:
+            st.error(mensagem)
 
 with col_direita:
     st.markdown('<div class="section-title">🕒 Histórico de movimentos</div>', unsafe_allow_html=True)
